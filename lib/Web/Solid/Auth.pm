@@ -20,18 +20,11 @@ has host => (
     is => 'ro' ,
     required => 1
 );
-has client_id => (
-    is => 'ro' ,
-    requires => 1
-);
 has redirect_uri => (
     is => 'ro' ,
     default => sub {
         "http://localhost:3000/"
     }
-);
-has shorten => (
-    is => 'ro'
 );
 has cache => (
     is => 'ro' ,
@@ -510,5 +503,101 @@ sub make_token_for {
     return $token;
 }
 
-
 1;
+
+__END__
+
+=head1 NAME
+
+Web::Solid::Auth - A Perl Sold Web Client
+
+=head1 SYNOPSIS
+
+    use Web::Solid::Auth;
+
+    # Create a new authentucator for a pod
+    my $auth = Web::Solid::Auth->new(host => $host);
+
+    # Generate a url for the user to authenticate
+    my $auth_url = $auth->make_authorization_request;
+
+    # Listen for the oauth server to return tokens
+    $auth->listen();
+
+    ####
+
+    # If you already have access_tokens from previous step
+    if ($auth->has_access_token) {
+
+        # Fetch the Authentication and DPoP HTTP headers for a
+        # request to an authorized resource
+        my $headers = $auth->make_authentication_headers($resource_url,$http_method);
+
+        #..do you curl..lwp::agent..or what ever with the headers
+    }
+
+=head1 DESCRIPTION
+
+This is a Solid-OIDC implementation of a connection class for the Solid
+server.
+
+=head1 CONFIGURATION
+
+=over
+
+=item host
+
+The Solid POD server to connect to.
+
+=item cache
+
+The location of the cache directory with connection parameters.
+
+=back
+
+=head1 METHODS
+
+=over
+
+=item has_access_token()
+
+Returns a true value when a cache contains an access token for the C<host>.
+
+=item make_clean()
+
+Clear the cache directory.
+
+=item make_authorization_request()
+
+Return an authorization URL that the use should open to authenticate this
+application.
+
+=item make_access_token($code)
+
+When on the redirect url you get a C<code> from the authentication server you
+can use this method to get an access_token for the code.
+
+=item listen()
+
+Create a small built-in web server to listen for token responses from the
+authentication server.
+
+=item get_access_token()
+
+Return the cached access_token.
+
+=back
+
+=head1 CONTRIBUTORS
+
+Patrick Hochstenbach, C<< patrick.hochstenbach at ugent.be >>
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2021 by Patrick Hochstenbach.
+
+This is free software; you can redistribute it and/or modify it under the same terms as the Perl 5 programming language system itself.
+
+=encoding utf8
+
+=cut
