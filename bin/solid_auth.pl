@@ -4,6 +4,7 @@ $|++;
 use lib qw(./lib);
 use Getopt::Long;
 use Web::Solid::Auth;
+use String::Escape;
 use Log::Any::Adapter;
 
 Log::Any::Adapter->set('Log4perl');
@@ -72,6 +73,9 @@ sub cmd_curl {
 
     usage() unless $method && $url;
 
+    if (@rest) {
+        @rest = map { String::Escape::quote($_) } @rest;
+    }
     my $headers = _headers($method,$url);
     my $opts    = join(" ",@rest);
     system("curl $opts $headers $url");
@@ -120,3 +124,27 @@ sub _headers {
 
     return join(" ",@headers);
 }
+
+__END__
+
+=head1 NAME
+
+solid_auth.pl - A solid authentication tool
+
+=head1 SYNOPSIS
+
+      # Authentication to a pod
+      solid_auth.pl authenticate https://hochstenbach.solidcommunity.net
+
+      # Get the http headers for a authenticated request
+      solid_auth.pl headers GET https://hochstenbach.solidcommunity.net/inbox
+
+      # Act like a curl command and fetch authenticated content
+      solid_auth.pl curl GET https://hochstenbach.solidcommunity.net/inbox
+
+      # Add some data
+      solid_auth.pl curl POST https://hochstenbach.solidcommunity.net/public/ \
+            -H "Content-Type: text/plain" \
+            -d "abc"
+
+=cut
