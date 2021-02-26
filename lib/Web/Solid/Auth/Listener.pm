@@ -10,27 +10,38 @@ our $VERSION = "0.1";
 
 has host => (
     is => 'ro' ,
-    required => 1
+    default => sub { 'localhost' }
 );
 has port => (
     is => 'ro' ,
-    required => 1
+    default => sub { '3000' }
 );
-has auth => (
+has scheme => (
     is => 'ro' ,
-    required => 1
+    default => sub { 'http' }
 );
 has path => (
     is => 'ro',
-    default => sub { '/' }
+    default => sub { '/callback' }
 );
 has log => (
     is => 'ro',
     default => sub { Log::Any->get_logger },
 );
 
-sub run {
+sub redirect_uri {
     my $self = shift;
+
+    return sprintf "%s://%s:%s%s"
+                    , $self->scheme
+                    , $self->host
+                    , $self->port
+                    , $self->path;
+}
+
+sub run {
+    my ($self,$auth) = @_;
+    $auth //= $self->auth;
 
     my $host = $self->host;
     my $port = $self->port;
@@ -50,7 +61,7 @@ sub run {
 
         my $req    = Plack::Request->new($env);
         my $param  = $req->parameters;
-        my $state  = $self->auth->{state};
+        my $state  = $auth->{state};
 
         $self->log->debugf("received: %s (%s) -> %s", $req->method, $req->path, $req->query_string);
 
@@ -70,7 +81,7 @@ sub run {
             return $res->finalize;
         }
 
-        my $data = $self->auth->make_access_token($param->{code});
+        my $data = $auth->make_access_token($param->{code});
 
         if ($data) {
             print "Ok stored you can close this program\n";

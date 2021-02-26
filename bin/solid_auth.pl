@@ -48,14 +48,7 @@ sub cmd_authenticate {
 
     $host =~ s{(http(s)://[^\/]+)(.*)}{$1}i;
 
-    my $redirect_host = 'localhost';
-    my $redirect_port = '3000';
-    my $redirect_path = '/callback';
-
-    my $auth = Web::Solid::Auth->new(
-            host => $host ,
-            redirect_uri => "http://$redirect_host:$redirect_port$redirect_path"
-    );
+    my $auth = Web::Solid::Auth->new(host => $host);
 
     $auth->make_clean;
 
@@ -65,12 +58,7 @@ sub cmd_authenticate {
 
     print "Starting callback server...\n";
 
-    my $listener = Web::Solid::Auth::Listener->new(
-            host => $redirect_host,
-            port => $redirect_port,
-            path => $redirect_path,
-            auth => $auth
-    )->run();
+    $auth->listen;
 }
 
 sub cmd_headers {
@@ -121,7 +109,7 @@ sub _headers {
 
     $host =~ s{(http(s)://[^\/]+)(.*)}{$1}i;
 
-    my $auth = Web::Solid::Auth->new(host => $host);
+    my $auth    = Web::Solid::Auth->new(host => $host);
 
     my $headers = $auth->make_authentication_headers($url,$method);
 

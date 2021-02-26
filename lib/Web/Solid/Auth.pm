@@ -14,6 +14,7 @@ use URI::Escape;
 use Plack::Request;
 use Plack::Response;
 use HTTP::Server::PSGI;
+use Web::Solid::Auth::Listener;
 
 our $VERSION = "0.1";
 
@@ -22,10 +23,7 @@ has host => (
     required => 1
 );
 has redirect_uri => (
-    is => 'ro' ,
-    default => sub {
-        "http://localhost:3000/"
-    }
+    is => 'ro'
 );
 has cache => (
     is => 'ro' ,
@@ -38,6 +36,9 @@ has log => (
 has agent => (
     is => 'lazy'
 );
+has listener => (
+    is => 'lazy'
+);
 
 sub _build_agent {
     my $ua     = new LWP::UserAgent;
@@ -45,10 +46,18 @@ sub _build_agent {
     $ua;
 }
 
-sub _build_pk {
-    my $pk = Crypt::PK::ECC->new();
-    $pk->generate_key('secp256r1');
-    $pk;
+sub _build_listener {
+    Web::Solid::Auth::Listener->new;
+}
+
+sub BUILD {
+    my $self = shift;
+    $self->{redirect_uri} //= $self->listener->redirect_uri;
+}
+
+sub listen {
+    my $self = shift;
+    $self->listener->run($self);
 }
 
 sub has_access_token {
@@ -464,21 +473,41 @@ Web::Solid::Auth - A Perl Sold Web Client
 =head1 SYNOPSIS
 
     use Web::Solid::Auth;
+    use Web::Solid::Auth::Listener;
 
-    # Create a new authentucator for a pod
+    # Create a new authenticator for a pod
     my $auth = Web::Solid::Auth->new(host => $host);
+
+    # Or tune a listerner
+    my $auth = Web::Solid::Auth->new(
+          host     => $host ,
+          listener => Web::Solid::Auth::Listener->new(
+                scheme => 'https'
+                host   => 'my.server.org'
+                port   => '443' ,
+                path   => '/mycallback'
+          )
+    );
+
+    # Or, in case you have your own callback server
+    my $auth = Web::Solid::Auth->new(
+          host         => $host,
+          redirect_uri => 'https://my.server.org/mycallback'
+    );
 
     # Generate a url for the user to authenticate
     my $auth_url = $auth->make_authorization_request;
 
     # Listen for the oauth server to return tokens
-    $auth->listen();
+    # the built-in listener for feedback from the openid provider
+    # Check the code of Web::Solid::Auth::Listener how to
+    # do this inside your own Plack application
+    $auth->listen;
 
     ####
 
     # If you already have access_tokens from previous step
     if ($auth->has_access_token) {
-
         # Fetch the Authentication and DPoP HTTP headers for a
         # request to an authorized resource
         my $headers = $auth->make_authentication_headers($resource_url,$http_method);
