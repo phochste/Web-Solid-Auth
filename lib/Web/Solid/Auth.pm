@@ -51,8 +51,6 @@ sub _build_agent {
     $ua;
 }
 
-<<<<<<< HEAD
-=======
 sub _build_listener {
     Web::Solid::Auth::Listener->new;
 }
@@ -71,7 +69,6 @@ sub listen {
     $self->listener->run($self);
 }
 
->>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub has_access_token {
     my $self = shift;
     my $cache_dir = $self->get_cache_dir;
@@ -118,6 +115,7 @@ sub make_authorization_request {
 
     my $code_verifier  = $self->make_random_string;
     my $code_challenge = MIME::Base64::encode_base64url(Digest::SHA::sha256($code_verifier),'');
+    $code_challenge  =~ s{=}{};
     my $state          = $self->make_random_string;
 
     my $url = $self->make_url(
@@ -175,46 +173,6 @@ sub make_access_token {
     return $data;
 }
 
-<<<<<<< HEAD
-=======
-sub make_refresh_token {
-    my ($self) = @_;
-
-    my $access            = $self->get_access_token;
-
-    return undef unless $access->{refresh_token};
-
-    my $openid_conf       = $self->get_openid_configuration;
-    my $registration_conf = $self->get_client_configuration;
-
-    my $token_endpoint    = $openid_conf->{token_endpoint};
-    my $client_id         = $registration_conf->{client_id};
-
-    my $refresh_token     = $access->{refresh_token};
-
-    my $headers = $self->make_authentication_headers($token_endpoint,'POST');
-
-    $self->log->info("requesting refresh token at $token_endpoint using $refresh_token");
-
-    my $data = $self->post($token_endpoint, [
-        grant_type    => 'refresh_token' ,
-        refresh_token => $refresh_token ,
-        client_id     => $client_id ,
-        valid_for     => 300 ,
-    ], %$headers);
-
-    return undef unless $data;
-
-    my $cache_dir = $self->get_cache_dir;
-    path($cache_dir)->mkpath unless -d $cache_dir;
-
-    my $cache_file = path($cache_dir)->child("access.json")->stringify;
-    path($cache_file)->spew(encode_json($data));
-
-    return $data;
-}
-
->>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub make_authentication_headers {
     my ($self, $uri, $method) = @_;
 
@@ -298,11 +256,7 @@ sub get_client_configuration {
 
         # Get the well known openid
         my $data = $self->post_json($registration_endpoint, {
-<<<<<<< HEAD
-            grant_types      => ["authorization_code refresh_token"],
-=======
             grant_types      => ["authorization_code", "refresh_token"],
->>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
             redirect_uris    => [ $redirect_uri ] ,
             scope            => "openid profile offline_access" ,
             response_types   => ["code"]

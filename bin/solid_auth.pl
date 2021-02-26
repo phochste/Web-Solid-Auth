@@ -88,7 +88,7 @@ sub cmd_headers {
     my ($method,$url) = @_;
 
     usage() unless $method && $url;
-    
+
     my $headers = _headers($method,$url);
 
     print "$headers\n";
@@ -116,26 +116,10 @@ sub cmd_curl {
     system("curl $headers $opts") == 0;
 }
 
-<<<<<<< HEAD
-=======
-sub cmd_refresh {
-    usage() unless $webid;
-
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-
-    my $data = $auth->make_refresh_token;
-
-    if ($data) {
-        print "Refresh ok\n";
-    }
-    else {
-        print "Refresh failed\n";
-    }
-}
-
 sub _get_cache {
     my $auth = Web::Solid::Auth->new(webid => 'urn:nobody');
     my $cache = $auth->cache;
+    return undef unless path("$cache")->child("default")->exists;
     path("$cache")->child("default")->slurp;
 }
 
@@ -147,7 +131,6 @@ sub _set_cache {
     path("$cache")->child("default")->spew($webid);
 }
 
->>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub _headers {
     my ($method,$url) = @_;
 

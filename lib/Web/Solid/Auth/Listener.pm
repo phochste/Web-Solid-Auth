@@ -87,7 +87,7 @@ sub run {
             print "Ok stored you can close this program\n";
             my $res = Plack::Response->new(200);
             $res->content_type("text/plain");
-            $res->body("You al logged in :)");
+            $res->body("You are logged in :)");
             return $res->finalize;
         }
         else {
