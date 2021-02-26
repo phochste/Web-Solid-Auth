@@ -2,23 +2,25 @@ package Web::Solid::Auth;
 
 use Moo;
 use Crypt::JWT;
+use Data::Dumper;
 use Data::UUID;
 use Digest::SHA;
+use HTTP::Link;
+use HTTP::Request;
+use HTTP::Server::PSGI;
 use Log::Any ();
 use LWP::UserAgent;
 use JSON;
 use MIME::Base64;
 use Path::Tiny;
-use Digest::SHA;
 use URI::Escape;
 use Plack::Request;
 use Plack::Response;
-use HTTP::Server::PSGI;
 use Web::Solid::Auth::Listener;
 
 our $VERSION = "0.1";
 
-has host => (
+has webid => (
     is => 'ro' ,
     required => 1
 );
@@ -39,6 +41,9 @@ has agent => (
 has listener => (
     is => 'lazy'
 );
+has issuer => (
+    is => 'lazy'
+);
 
 sub _build_agent {
     my $ua     = new LWP::UserAgent;
@@ -48,6 +53,10 @@ sub _build_agent {
 
 sub _build_listener {
     Web::Solid::Auth::Listener->new;
+}
+
+sub _build_issuer {
+    shift->get_openid_provider();
 }
 
 sub BUILD {
@@ -218,11 +227,11 @@ sub make_authentication_headers {
 
 sub get_cache_dir {
     my $self = shift;
-    my $host       = $self->host;
-    my $host_sha   = Digest::SHA::sha1_hex($host);
+    my $webid      = $self->webid;
+    my $webid_sha  = Digest::SHA::sha1_hex($webid);
     my $cache_dir  = sprintf "%s/%s"
                             , $self->cache
-                            , Digest::SHA::sha1_hex($host);
+                            , Digest::SHA::sha1_hex($webid);
     return $cache_dir;
 }
 
@@ -242,6 +251,29 @@ sub get_access_token {
     return undef unless $json;
 
     return decode_json($json);
+}
+
+sub get_openid_provider {
+    my ($self, $webid) = @_;
+    $webid //= $self->webid;
+
+    my $res = $self->options($webid);
+
+    return undef unless $res;
+
+    my $link = $res->header('Link');
+
+    my @links = HTTP::Link->parse($link);
+
+    my $issuer;
+
+    for (@links) {
+      if ($_->{relation} eq 'http://openid.net/specs/connect/1.0/issuer') {
+          $issuer = $_->{iri};
+      }
+    }
+
+    return $issuer;
 }
 
 sub get_client_configuration {
@@ -286,7 +318,7 @@ sub get_client_configuration {
 sub get_openid_configuration {
     my ($self) = @_;
 
-    my $host      = $self->host;
+    my $issuer    = $self->issuer;
 
     my $cache_dir = $self->get_cache_dir;
     path($cache_dir)->mkpath unless -d $cache_dir;
@@ -294,7 +326,7 @@ sub get_openid_configuration {
     my $cache_file = path($cache_dir)->child("openid.json")->stringify;
 
     unless (-f $cache_file) {
-        my $url = "$host/.well-known/openid-configuration";
+        my $url = "$issuer/.well-known/openid-configuration";
 
         $self->log->info("reading openid configruation from $url");
 
@@ -405,6 +437,21 @@ sub post_json {
     return decode_json($response->decoded_content);
 }
 
+sub options {
+    my ($self, $url) = @_;
+
+    my $response = $self->agent->request(
+        HTTP::Request->new(OPTIONS => $url)
+    );
+
+    unless ($response->is_success) {
+        $self->log->errorf("failed to OPTIONS($url): %s" , $response);
+        return undef;
+    }
+
+    return $response;
+}
+
 sub make_url {
     my ($self, $url,$params) = @_;
 
@@ -476,11 +523,11 @@ Web::Solid::Auth - A Perl Sold Web Client
     use Web::Solid::Auth::Listener;
 
     # Create a new authenticator for a pod
-    my $auth = Web::Solid::Auth->new(host => $host);
+    my $auth = Web::Solid::Auth->new(webid => $webid);
 
     # Or tune a listerner
     my $auth = Web::Solid::Auth->new(
-          host     => $host ,
+          webid     => $webid ,
           listener => Web::Solid::Auth::Listener->new(
                 scheme => 'https'
                 host   => 'my.server.org'
@@ -491,7 +538,7 @@ Web::Solid::Auth - A Perl Sold Web Client
 
     # Or, in case you have your own callback server
     my $auth = Web::Solid::Auth->new(
-          host         => $host,
+          webid         => $webid,
           redirect_uri => 'https://my.server.org/mycallback'
     );
 
@@ -524,9 +571,9 @@ server.
 
 =over
 
-=item host
+=item webid
 
-The Solid POD server to connect to.
+The Solid Webid to authenticate.
 
 =item cache
 
@@ -540,7 +587,7 @@ The location of the cache directory with connection parameters.
 
 =item has_access_token()
 
-Returns a true value when a cache contains an access token for the C<host>.
+Returns a true value when a cache contains an access token for the C<webid>.
 
 =item make_clean()
 

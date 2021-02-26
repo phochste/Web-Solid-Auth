@@ -14,3 +14,4 @@ requires 'Log::Any::Adapter::Log4perl',0;
 requires 'Log::Log4perl',0;
 requires 'Plack',0;
 requires 'String::Escape',0;
+requires 'HTTP::Link',0;

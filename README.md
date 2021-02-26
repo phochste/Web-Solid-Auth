@@ -5,21 +5,41 @@ Web::Solid::Auth - A Perl Sold Web Client
 # SYNOPSIS
 
     use Web::Solid::Auth;
+    use Web::Solid::Auth::Listener;
 
-    # Create a new authentucator for a pod
-    my $auth = Web::Solid::Auth->new(host => $host);
+    # Create a new authenticator for a pod
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+
+    # Or tune a listerner
+    my $auth = Web::Solid::Auth->new(
+          webid     => $webid ,
+          listener => Web::Solid::Auth::Listener->new(
+                scheme => 'https'
+                host   => 'my.server.org'
+                port   => '443' ,
+                path   => '/mycallback'
+          )
+    );
+
+    # Or, in case you have your own callback server
+    my $auth = Web::Solid::Auth->new(
+          webid         => $webid,
+          redirect_uri => 'https://my.server.org/mycallback'
+    );
 
     # Generate a url for the user to authenticate
     my $auth_url = $auth->make_authorization_request;
 
     # Listen for the oauth server to return tokens
-    $auth->listen();
+    # the built-in listener for feedback from the openid provider
+    # Check the code of Web::Solid::Auth::Listener how to
+    # do this inside your own Plack application
+    $auth->listen;
 
     ####
 
     # If you already have access_tokens from previous step
     if ($auth->has_access_token) {
-
         # Fetch the Authentication and DPoP HTTP headers for a
         # request to an authorized resource
         my $headers = $auth->make_authentication_headers($resource_url,$http_method);
@@ -34,9 +54,9 @@ server.
 
 # CONFIGURATION
 
-- host
+- webid
 
-    The Solid POD server to connect to.
+    The Solid Webid to authenticate.
 
 - cache
 
@@ -46,7 +66,7 @@ server.
 
 - has\_access\_token()
 
-    Returns a true value when a cache contains an access token for the `host`.
+    Returns a true value when a cache contains an access token for the `webid`.
 
 - make\_clean()
 
