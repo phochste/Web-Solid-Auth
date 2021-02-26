@@ -1,6 +1,7 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
-
+  - Ading an example web (Plack) application
+  
 0.1  2021-02-26 16:14:42 CET
   - Initial version

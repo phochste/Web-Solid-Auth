@@ -529,6 +529,7 @@ Web::Solid::Auth - A Perl Sold Web Client
 
 This is a Solid-OIDC implementation of a connection class for the Solid
 server. Use the C<bin/solid_auth.pl> command as a command line implementation.
+Check out the C<example> directory for a demo web application.
 
 =head1 CONFIGURATION
 
