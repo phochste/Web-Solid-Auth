@@ -1,6 +1,6 @@
 # NAME
 
-Web::Solid::Auth - A Perl Sold Web Client
+Web::Solid::Auth - A Perl Solid Web Client
 
 # SYNOPSIS
 

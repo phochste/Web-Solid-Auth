@@ -478,7 +478,7 @@ __END__
 
 =head1 NAME
 
-Web::Solid::Auth - A Perl Sold Web Client
+Web::Solid::Auth - A Perl Solid Web Client
 
 =head1 SYNOPSIS
 

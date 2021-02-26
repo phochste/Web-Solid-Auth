@@ -162,7 +162,7 @@ solid_auth.pl - A solid authentication tool
 =head1 SYNOPSIS
 
       # Set your default webid
-      solid_auth.pl set https://hochstenbach.solidcommunity.net/profile/card#me%
+      solid_auth.pl set https://hochstenbach.solidcommunity.net/profile/card#me
 
       # Authentication to a pod
       solid_auth.pl authenticate
