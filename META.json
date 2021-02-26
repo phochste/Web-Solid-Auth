@@ -54,6 +54,14 @@
             "String::Escape" : "0",
             "perl" : "v5.10.1"
          }
+      },
+      "test" : {
+         "requires" : {
+            "Test::Exception" : "0.32",
+            "Test::More" : "1.001003",
+            "Test::Pod" : "0",
+            "Test::Simple" : "1.001003"
+         }
       }
    },
    "release_status" : "stable",

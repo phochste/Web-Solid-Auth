@@ -50,7 +50,7 @@ Web::Solid::Auth - A Perl Sold Web Client
 # DESCRIPTION
 
 This is a Solid-OIDC implementation of a connection class for the Solid
-server.
+server. Use the `bin/solid_auth.pl` command as a command line implementation.
 
 # CONFIGURATION
 
@@ -90,6 +90,10 @@ server.
 - get\_access\_token()
 
     Return the cached access\_token.
+
+# SEE ALSO
+
+[solid\_auth.pl](https://metacpan.org/pod/solid_auth.pl)
 
 # CONTRIBUTORS
 

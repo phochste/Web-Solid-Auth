@@ -565,7 +565,7 @@ Web::Solid::Auth - A Perl Sold Web Client
 =head1 DESCRIPTION
 
 This is a Solid-OIDC implementation of a connection class for the Solid
-server.
+server. Use the C<bin/solid_auth.pl> command as a command line implementation.
 
 =head1 CONFIGURATION
 
@@ -613,6 +613,10 @@ authentication server.
 Return the cached access_token.
 
 =back
+
+=head1 SEE ALSO
+
+L<solid_auth.pl>
 
 =head1 CONTRIBUTORS
 
