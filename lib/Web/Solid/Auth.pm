@@ -11,8 +11,9 @@ use MIME::Base64;
 use Path::Tiny;
 use Digest::SHA;
 use URI::Escape;
+use Plack::Request;
+use Plack::Response;
 use HTTP::Server::PSGI;
-use Data::Dumper;
 
 our $VERSION = "0.1";
 
@@ -167,15 +168,18 @@ sub make_refresh_token {
     my $token_endpoint    = $openid_conf->{token_endpoint};
     my $client_id         = $registration_conf->{client_id};
 
-    my $dpop_token = $self->make_token_for($token_endpoint,'POST');
+    my $refresh_token     = $access->{refresh_token};
 
-    $self->log->info("requesting refresh token at $token_endpoint");
+    my $headers = $self->make_authentication_headers($token_endpoint,'POST');
 
-    my $data = $self->post($token_endpoint, {
+    $self->log->info("requesting refresh token at $token_endpoint using $refresh_token");
+
+    my $data = $self->post($token_endpoint, [
         grant_type    => 'refresh_token' ,
-        refresh_token => $access->{refresh_token} ,
+        refresh_token => $refresh_token ,
         client_id     => $client_id ,
-    }, DPoP => $dpop_token);
+        valid_for     => 300 ,
+    ], %$headers);
 
     return undef unless $data;
 
@@ -201,62 +205,6 @@ sub make_authentication_headers {
     };
 
     return $headers;
-}
-
-sub listen {
-    my $self = shift;
-
-    $self->log->info("starting callback server on port 3000");
-
-    my $server = HTTP::Server::PSGI->new(
-        host => "127.0.0.1",
-        port => 3000,
-        timeout => 120,
-    );
-
-    $server->run(
-      sub {
-        my $env = shift;
-
-        my $state          = $self->{state};
-        my $request_method = $env->{REQUEST_METHOD};
-        my $query_string   = $env->{QUERY_STRING};
-
-        $self->log->debug("received: $request_method -> $query_string");
-
-        unless ($request_method eq 'GET' && index($query_string,"state=$state") != -1 ) {
-            return [
-                  404,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Failed to get an access_token" ],
-            ];
-        }
-
-        my %param;
-        foreach my $pair (split(/&/,$query_string)){
-            my ($name, $value) = split(/=/, $pair, 2);
-            $param{$name} = URI::Escape::uri_unescape($value);
-        }
-
-        my $data = $self->make_access_token($param{code});
-
-        if ($data) {
-            print "Ok stored you can close this program\n";
-            return [
-                  200,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Done" ],
-            ];
-        }
-        else {
-            return [
-                  404,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Failed to get an access_token" ],
-            ];
-        }
-      }
-    );
 }
 
 sub get_cache_dir {
@@ -304,11 +252,10 @@ sub get_client_configuration {
 
         # Get the well known openid
         my $data = $self->post_json($registration_endpoint, {
-            grant_types      => ["authorization_code"],
+            grant_types      => ["authorization_code", "refresh_token"],
             redirect_uris    => [ $redirect_uri ] ,
-            response_types   => ["id_token token"],
-            scope            => "openid profile offline_access",
-            application_type => "web"
+            scope            => "openid profile offline_access" ,
+            response_types   => ["code"]
         });
 
         return undef unless $data;
@@ -418,7 +365,10 @@ sub get_json {
 sub post {
     my ($self, $url, $data, %opts) = @_;
 
-    my $response = $self->agent->post($url,$data,%opts);
+    my $response = $self->agent->post($url,
+          %opts,
+          Content => $data
+    );
 
     unless ($response->is_success) {
         $self->log->errorf("failed to POST($url): %s",$response);

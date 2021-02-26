@@ -10,6 +10,7 @@ requires 'Data::UUID',0;
 requires 'Digest::SHA',0;
 requires 'Moo',0;
 requires 'Log::Any',0;
+requires 'Log::Any::Adapter::Log4perl',0;
 requires 'Log::Log4perl',0;
-requires 'HTTP::Server::PSGI',0;
+requires 'Plack',0;
 requires 'String::Escape',0;
