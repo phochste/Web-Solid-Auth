@@ -1,3 +1,6 @@
-cpanfile.snapshot
+.DS_Store
+.perl-version
 .build
+cpanfile.snapshot
 local
+Web-Solid-Auth*

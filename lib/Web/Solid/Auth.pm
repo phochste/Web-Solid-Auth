@@ -2,29 +2,30 @@ package Web::Solid::Auth;
 
 use Moo;
 use Crypt::JWT;
+use Data::Dumper;
 use Data::UUID;
 use Digest::SHA;
+use HTTP::Link;
+use HTTP::Request;
+use HTTP::Server::PSGI;
 use Log::Any ();
 use LWP::UserAgent;
 use JSON;
 use MIME::Base64;
 use Path::Tiny;
-use Digest::SHA;
 use URI::Escape;
-use HTTP::Server::PSGI;
-use Data::Dumper;
+use Plack::Request;
+use Plack::Response;
+use Web::Solid::Auth::Listener;
 
 our $VERSION = "0.1";
 
-has host => (
+has webid => (
     is => 'ro' ,
     required => 1
 );
 has redirect_uri => (
-    is => 'ro' ,
-    default => sub {
-        "http://localhost:3000/"
-    }
+    is => 'ro'
 );
 has cache => (
     is => 'ro' ,
@@ -37,6 +38,12 @@ has log => (
 has agent => (
     is => 'lazy'
 );
+has listener => (
+    is => 'lazy'
+);
+has issuer => (
+    is => 'lazy'
+);
 
 sub _build_agent {
     my $ua     = new LWP::UserAgent;
@@ -44,6 +51,27 @@ sub _build_agent {
     $ua;
 }
 
+<<<<<<< HEAD
+=======
+sub _build_listener {
+    Web::Solid::Auth::Listener->new;
+}
+
+sub _build_issuer {
+    shift->get_openid_provider();
+}
+
+sub BUILD {
+    my $self = shift;
+    $self->{redirect_uri} //= $self->listener->redirect_uri;
+}
+
+sub listen {
+    my $self = shift;
+    $self->listener->run($self);
+}
+
+>>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub has_access_token {
     my $self = shift;
     my $cache_dir = $self->get_cache_dir;
@@ -147,6 +175,46 @@ sub make_access_token {
     return $data;
 }
 
+<<<<<<< HEAD
+=======
+sub make_refresh_token {
+    my ($self) = @_;
+
+    my $access            = $self->get_access_token;
+
+    return undef unless $access->{refresh_token};
+
+    my $openid_conf       = $self->get_openid_configuration;
+    my $registration_conf = $self->get_client_configuration;
+
+    my $token_endpoint    = $openid_conf->{token_endpoint};
+    my $client_id         = $registration_conf->{client_id};
+
+    my $refresh_token     = $access->{refresh_token};
+
+    my $headers = $self->make_authentication_headers($token_endpoint,'POST');
+
+    $self->log->info("requesting refresh token at $token_endpoint using $refresh_token");
+
+    my $data = $self->post($token_endpoint, [
+        grant_type    => 'refresh_token' ,
+        refresh_token => $refresh_token ,
+        client_id     => $client_id ,
+        valid_for     => 300 ,
+    ], %$headers);
+
+    return undef unless $data;
+
+    my $cache_dir = $self->get_cache_dir;
+    path($cache_dir)->mkpath unless -d $cache_dir;
+
+    my $cache_file = path($cache_dir)->child("access.json")->stringify;
+    path($cache_file)->spew(encode_json($data));
+
+    return $data;
+}
+
+>>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub make_authentication_headers {
     my ($self, $uri, $method) = @_;
 
@@ -162,69 +230,13 @@ sub make_authentication_headers {
     return $headers;
 }
 
-sub listen {
-    my $self = shift;
-
-    $self->log->info("starting callback server on port 3000");
-
-    my $server = HTTP::Server::PSGI->new(
-        host => "127.0.0.1",
-        port => 3000,
-        timeout => 120,
-    );
-
-    $server->run(
-      sub {
-        my $env = shift;
-
-        my $state          = $self->{state};
-        my $request_method = $env->{REQUEST_METHOD};
-        my $query_string   = $env->{QUERY_STRING};
-
-        $self->log->debug("received: $request_method -> $query_string");
-
-        unless ($request_method eq 'GET' && index($query_string,"state=$state") != -1 ) {
-            return [
-                  404,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Failed to get an access_token" ],
-            ];
-        }
-
-        my %param;
-        foreach my $pair (split(/&/,$query_string)){
-            my ($name, $value) = split(/=/, $pair, 2);
-            $param{$name} = URI::Escape::uri_unescape($value);
-        }
-
-        my $data = $self->make_access_token($param{code});
-
-        if ($data) {
-            print "Ok stored you can close this program\n";
-            return [
-                  200,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Done" ],
-            ];
-        }
-        else {
-            return [
-                  404,
-                  [ 'Content-Type' => 'text/plain' ],
-                  [ "Failed to get an access_token" ],
-            ];
-        }
-      }
-    );
-}
-
 sub get_cache_dir {
     my $self = shift;
-    my $host       = $self->host;
-    my $host_sha   = Digest::SHA::sha1_hex($host);
+    my $webid      = $self->webid;
+    my $webid_sha  = Digest::SHA::sha1_hex($webid);
     my $cache_dir  = sprintf "%s/%s"
                             , $self->cache
-                            , Digest::SHA::sha1_hex($host);
+                            , Digest::SHA::sha1_hex($webid);
     return $cache_dir;
 }
 
@@ -246,6 +258,29 @@ sub get_access_token {
     return decode_json($json);
 }
 
+sub get_openid_provider {
+    my ($self, $webid) = @_;
+    $webid //= $self->webid;
+
+    my $res = $self->options($webid);
+
+    return undef unless $res;
+
+    my $link = $res->header('Link');
+
+    my @links = HTTP::Link->parse($link);
+
+    my $issuer;
+
+    for (@links) {
+      if ($_->{relation} eq 'http://openid.net/specs/connect/1.0/issuer') {
+          $issuer = $_->{iri};
+      }
+    }
+
+    return $issuer;
+}
+
 sub get_client_configuration {
     my $self = shift;
 
@@ -263,11 +298,14 @@ sub get_client_configuration {
 
         # Get the well known openid
         my $data = $self->post_json($registration_endpoint, {
+<<<<<<< HEAD
             grant_types      => ["authorization_code refresh_token"],
+=======
+            grant_types      => ["authorization_code", "refresh_token"],
+>>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
             redirect_uris    => [ $redirect_uri ] ,
-            response_types   => ["id_token token"],
-            scope            => "openid profile offline_access",
-            application_type => "web"
+            scope            => "openid profile offline_access" ,
+            response_types   => ["code"]
         });
 
         return undef unless $data;
@@ -289,7 +327,7 @@ sub get_client_configuration {
 sub get_openid_configuration {
     my ($self) = @_;
 
-    my $host      = $self->host;
+    my $issuer    = $self->issuer;
 
     my $cache_dir = $self->get_cache_dir;
     path($cache_dir)->mkpath unless -d $cache_dir;
@@ -297,7 +335,7 @@ sub get_openid_configuration {
     my $cache_file = path($cache_dir)->child("openid.json")->stringify;
 
     unless (-f $cache_file) {
-        my $url = "$host/.well-known/openid-configuration";
+        my $url = "$issuer/.well-known/openid-configuration";
 
         $self->log->info("reading openid configruation from $url");
 
@@ -377,7 +415,10 @@ sub get_json {
 sub post {
     my ($self, $url, $data, %opts) = @_;
 
-    my $response = $self->agent->post($url,$data,%opts);
+    my $response = $self->agent->post($url,
+          %opts,
+          Content => $data
+    );
 
     unless ($response->is_success) {
         $self->log->errorf("failed to POST($url): %s",$response);
@@ -403,6 +444,21 @@ sub post_json {
     }
 
     return decode_json($response->decoded_content);
+}
+
+sub options {
+    my ($self, $url) = @_;
+
+    my $response = $self->agent->request(
+        HTTP::Request->new(OPTIONS => $url)
+    );
+
+    unless ($response->is_success) {
+        $self->log->errorf("failed to OPTIONS($url): %s" , $response);
+        return undef;
+    }
+
+    return $response;
 }
 
 sub make_url {
@@ -473,21 +529,41 @@ Web::Solid::Auth - A Perl Sold Web Client
 =head1 SYNOPSIS
 
     use Web::Solid::Auth;
+    use Web::Solid::Auth::Listener;
 
-    # Create a new authentucator for a pod
-    my $auth = Web::Solid::Auth->new(host => $host);
+    # Create a new authenticator for a pod
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+
+    # Or tune a listerner
+    my $auth = Web::Solid::Auth->new(
+          webid     => $webid ,
+          listener => Web::Solid::Auth::Listener->new(
+                scheme => 'https'
+                host   => 'my.server.org'
+                port   => '443' ,
+                path   => '/mycallback'
+          )
+    );
+
+    # Or, in case you have your own callback server
+    my $auth = Web::Solid::Auth->new(
+          webid         => $webid,
+          redirect_uri => 'https://my.server.org/mycallback'
+    );
 
     # Generate a url for the user to authenticate
     my $auth_url = $auth->make_authorization_request;
 
     # Listen for the oauth server to return tokens
-    $auth->listen();
+    # the built-in listener for feedback from the openid provider
+    # Check the code of Web::Solid::Auth::Listener how to
+    # do this inside your own Plack application
+    $auth->listen;
 
     ####
 
     # If you already have access_tokens from previous step
     if ($auth->has_access_token) {
-
         # Fetch the Authentication and DPoP HTTP headers for a
         # request to an authorized resource
         my $headers = $auth->make_authentication_headers($resource_url,$http_method);
@@ -498,15 +574,15 @@ Web::Solid::Auth - A Perl Sold Web Client
 =head1 DESCRIPTION
 
 This is a Solid-OIDC implementation of a connection class for the Solid
-server.
+server. Use the C<bin/solid_auth.pl> command as a command line implementation.
 
 =head1 CONFIGURATION
 
 =over
 
-=item host
+=item webid
 
-The Solid POD server to connect to.
+The Solid Webid to authenticate.
 
 =item cache
 
@@ -520,7 +596,7 @@ The location of the cache directory with connection parameters.
 
 =item has_access_token()
 
-Returns a true value when a cache contains an access token for the C<host>.
+Returns a true value when a cache contains an access token for the C<webid>.
 
 =item make_clean()
 
@@ -546,6 +622,10 @@ authentication server.
 Return the cached access_token.
 
 =back
+
+=head1 SEE ALSO
+
+L<solid_auth.pl>
 
 =head1 CONTRIBUTORS
 

@@ -2,18 +2,33 @@
 $|++;
 
 use lib qw(./lib);
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through);
 use Web::Solid::Auth;
+use Path::Tiny;
 use String::Escape;
 use Log::Any::Adapter;
 
 Log::Any::Adapter->set('Log4perl');
-
 Log::Log4perl::init('log4perl.conf');
+
+my $webid;
+
+GetOptions("webid|w=s" => \$webid);
 
 my $cmd = shift;
 
-if ($cmd eq 'authenticate') {
+unless ($webid) {
+    $webid = _get_cache();
+}
+
+if (0) {}
+elsif ($cmd eq 'set') {
+    cmd_set(@ARGV);
+}
+elsif ($cmd eq 'get') {
+    cmd_get(@ARGV);
+}
+elsif ($cmd eq 'authenticate') {
     cmd_authenticate(@ARGV);
 }
 elsif ($cmd eq 'headers') {
@@ -28,23 +43,35 @@ else {
 
 sub usage {
     print STDERR <<EOF;
-usage: $0 authenticate URL
-usage: $0 headers METHOD URL
-usage: $0 curl METHOD URL
+usage: $0 set webid
+usage: $0 get
+usage: $0 [options] authenticate
+usage: $0 [options] headers METHOD URL
+usage: $0 [options] curl <...>
+
+options:
+    --webid|w webid
+
 EOF
     exit 1
 }
 
+sub cmd_set {
+    my $webid = shift;
+
+    usage() unless $webid;
+
+    _set_cache($webid);
+}
+
+sub cmd_get {
+    print _get_cache() , "\n";
+}
+
 sub cmd_authenticate {
-    my $url = shift;
+    usage() unless $webid;
 
-    usage() unless $url;
-
-    my $host = $url;
-
-    $host =~ s{(http(s)://[^\/]+)(.*)}{$1}i;
-
-    my $auth = Web::Solid::Auth->new(host => $host);
+    my $auth = Web::Solid::Auth->new(webid => $webid);
 
     $auth->make_clean;
 
@@ -54,42 +81,84 @@ sub cmd_authenticate {
 
     print "Starting callback server...\n";
 
-    $auth->listen();
+    $auth->listen;
 }
 
 sub cmd_headers {
     my ($method,$url) = @_;
 
+    usage() unless $method && $url;
+    
     my $headers = _headers($method,$url);
 
     print "$headers\n";
 }
 
 sub cmd_curl {
-    my ($method,$url,@rest) = @_;
+    my (@rest) = @_;
 
-    usage() unless $method && $url;
+    usage() unless @rest;
+
+    my $method = 'GET';
+    my $url = $rest[-1];
 
     if (@rest) {
+        for (my $i = 0 ; $i < @rest ; $i++) {
+            if ($rest[$i] eq '-X') {
+                $method = $rest[$i+1];
+            }
+        }
         @rest = map { String::Escape::quote($_) } @rest;
     }
+
     my $headers = _headers($method,$url);
     my $opts    = join(" ",@rest);
-    system("curl $opts $headers $url");
+    system("curl $headers $opts") == 0;
 }
 
+<<<<<<< HEAD
+=======
+sub cmd_refresh {
+    usage() unless $webid;
+
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+
+    my $data = $auth->make_refresh_token;
+
+    if ($data) {
+        print "Refresh ok\n";
+    }
+    else {
+        print "Refresh failed\n";
+    }
+}
+
+sub _get_cache {
+    my $auth = Web::Solid::Auth->new(webid => 'urn:nobody');
+    my $cache = $auth->cache;
+    path("$cache")->child("default")->slurp;
+}
+
+sub _set_cache {
+    my $webid = shift;
+
+    my $auth = Web::Solid::Auth->new(webid => 'urn:nobody');
+    my $cache = $auth->cache;
+    path("$cache")->child("default")->spew($webid);
+}
+
+>>>>>>> 8d5a632d3fcc4650f0b78a2b2d47d4a012bbc9e7
 sub _headers {
     my ($method,$url) = @_;
-    my $host = $url;
 
-    $host =~ s{(http(s)://[^\/]+)(.*)}{$1}i;
+    $webid    //= $url;
 
-    my $auth = Web::Solid::Auth->new(host => $host);
+    my $auth    = Web::Solid::Auth->new(webid => $webid);
 
     my $headers = $auth->make_authentication_headers($url,$method);
 
     unless ($headers) {
-        print STDERR "No access tokens found for $host. Maybe you need to authenticate first?\n";
+        print STDERR "No access tokens found for $webid. Maybe you need to authenticate first?\n";
         exit 2;
     }
 
@@ -109,18 +178,22 @@ solid_auth.pl - A solid authentication tool
 
 =head1 SYNOPSIS
 
+      # Set your default webid
+      solid_auth.pl set https://hochstenbach.solidcommunity.net/profile/card#me%
+
       # Authentication to a pod
-      solid_auth.pl authenticate https://hochstenbach.solidcommunity.net
+      solid_auth.pl authenticate
 
       # Get the http headers for a authenticated request
       solid_auth.pl headers GET https://hochstenbach.solidcommunity.net/inbox
 
       # Act like a curl command and fetch authenticated content
-      solid_auth.pl curl GET https://hochstenbach.solidcommunity.net/inbox
+      solid_auth.pl curl -X GET https://hochstenbach.solidcommunity.net/inbox
 
       # Add some data
-      solid_auth.pl curl POST https://hochstenbach.solidcommunity.net/public/ \
+      solid_auth.pl curl -X POST \
             -H "Content-Type: text/plain" \
-            -d "abc"
+            -d "abc" \
+            https://hochstenbach.solidcommunity.net/public/
 
 =cut
