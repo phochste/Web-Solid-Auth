@@ -22,9 +22,6 @@ elsif ($cmd eq 'headers') {
 elsif ($cmd eq 'curl') {
     cmd_curl(@ARGV);
 }
-elsif ($cmd eq 'refresh') {
-    cmd_refresh(@ARGV);
-}
 else {
     usage();
 }
@@ -79,27 +76,6 @@ sub cmd_curl {
     my $headers = _headers($method,$url);
     my $opts    = join(" ",@rest);
     system("curl $opts $headers $url");
-}
-
-sub cmd_refresh {
-    my $url = shift;
-
-    usage() unless $url;
-
-    my $host = $url;
-
-    $host =~ s{(http(s)://[^\/]+)(.*)}{$1}i;
-
-    my $auth = Web::Solid::Auth->new(host => $host);
-
-    my $data = $auth->make_refresh_token;
-
-    if ($data) {
-        print "Refresh ok\n";
-    }
-    else {
-        print "Refresh failed\n";
-    }
 }
 
 sub _headers {

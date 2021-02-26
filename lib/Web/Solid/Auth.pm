@@ -44,12 +44,6 @@ sub _build_agent {
     $ua;
 }
 
-sub _build_pk {
-    my $pk = Crypt::PK::ECC->new();
-    $pk->generate_key('secp256r1');
-    $pk;
-}
-
 sub has_access_token {
     my $self = shift;
     my $cache_dir = $self->get_cache_dir;
@@ -96,7 +90,6 @@ sub make_authorization_request {
 
     my $code_verifier  = $self->make_random_string;
     my $code_challenge = MIME::Base64::encode_base64url(Digest::SHA::sha256($code_verifier),'');
-    $code_challenge  =~ s{=}{};
     my $state          = $self->make_random_string;
 
     my $url = $self->make_url(
@@ -141,40 +134,6 @@ sub make_access_token {
         redirect_uri  => $redirect_uri ,
         code          => $code ,
         code_verifier => $self->{code_verifier}
-    }, DPoP => $dpop_token);
-
-    return undef unless $data;
-
-    my $cache_dir = $self->get_cache_dir;
-    path($cache_dir)->mkpath unless -d $cache_dir;
-
-    my $cache_file = path($cache_dir)->child("access.json")->stringify;
-    path($cache_file)->spew(encode_json($data));
-
-    return $data;
-}
-
-sub make_refresh_token {
-    my ($self) = @_;
-
-    my $access            = $self->get_access_token;
-
-    return undef unless $access->{refresh_token};
-
-    my $openid_conf       = $self->get_openid_configuration;
-    my $registration_conf = $self->get_client_configuration;
-
-    my $token_endpoint    = $openid_conf->{token_endpoint};
-    my $client_id         = $registration_conf->{client_id};
-
-    my $dpop_token = $self->make_token_for($token_endpoint,'POST');
-
-    $self->log->info("requesting refresh token at $token_endpoint");
-
-    my $data = $self->post($token_endpoint, {
-        grant_type    => 'refresh_token' ,
-        refresh_token => $access->{refresh_token} ,
-        client_id     => $client_id ,
     }, DPoP => $dpop_token);
 
     return undef unless $data;
@@ -304,7 +263,7 @@ sub get_client_configuration {
 
         # Get the well known openid
         my $data = $self->post_json($registration_endpoint, {
-            grant_types      => ["authorization_code"],
+            grant_types      => ["authorization_code refresh_token"],
             redirect_uris    => [ $redirect_uri ] ,
             response_types   => ["id_token token"],
             scope            => "openid profile offline_access",
