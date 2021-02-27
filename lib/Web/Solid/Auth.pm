@@ -254,7 +254,11 @@ sub get_client_configuration {
     unless (-f $cache_file) {
         $self->log->info("registering client at $registration_endpoint");
 
-        # Get the well known openid
+        # Dynamic register the client. We request the openid and profile
+        # scopes that are default for OpenID. The offline_access is
+        # to be able to request refresh_tokens (not yet implemented).
+        # The only safe response type is 'code' all other options send
+        # sensitive data over the front channel and shouldn't be used.
         my $data = $self->post_json($registration_endpoint, {
             grant_types      => ["authorization_code", "refresh_token"],
             redirect_uris    => [ $redirect_uri ] ,
@@ -321,7 +325,8 @@ sub get_key_configuration {
     my $cache_file = path($cache_dir)->child("key.json")->stringify;
 
     unless (-f $cache_file) {
-        # Get the well known openid
+        # Create an P-256 elliptic curve key we will use in DPoP
+        # headers.
         my $pk = Crypt::PK::ECC->new();
         $pk->generate_key('secp256r1');
 
@@ -443,6 +448,19 @@ sub make_random_string {
 sub make_token_for {
     my ($self, $uri, $method) = @_;
 
+    # With DPoP headers access_tokens can be protected. When requesting
+    # an access_token from a token_endpoint a DPoP headers is included
+    # which contains our public key (inside the signed token header).
+    # Our public key will then be part of the returned access_token.
+    #
+    # When later on you will send the access_token to a resource provider
+    # it can check the signed DPoP header in combination with our public
+    # key in the access_token that you are in posession of the private key
+    # that matches the public key in the access_token.
+    #
+    # In this way, when some evil resource provider steals your access_token
+    # it can't be reused without your private key.
+
     my $pk = $self->get_key_configuration;
 
     my $header = {
@@ -454,9 +472,14 @@ sub make_token_for {
     $self->log->debugf("DPoP(header) %s" , $header);
 
     my $payload = {
+          # A jti is a random string that protects the token_endpoint server
+          # against replay attacks
           jti => $self->make_random_string,
+          # Limits the DPoP token only to this method
           htm => $method ,
+          # Limits the DPop token only to this uri
           htu => $uri ,
+          # The time this token was issued
           iat => time ,
     };
 
@@ -581,6 +604,11 @@ Return the cached access_token.
 =head1 SEE ALSO
 
 L<solid_auth.pl>
+
+=head1 INSPIRATION
+
+This was very much inspired by the Python solid-flask code by
+Rai L<http://agentydragon.com> at L<https://gitlab.com/agentydragon/solid-flask>
 
 =head1 CONTRIBUTORS
 
