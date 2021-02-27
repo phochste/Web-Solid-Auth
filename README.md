@@ -96,6 +96,11 @@ Check out the `example` directory for a demo web application.
 
 [solid\_auth.pl](https://metacpan.org/pod/solid_auth.pl)
 
+# INSPIRATION
+
+This was very much inspired by the Python solid-flask code by
+Rai [http://agentydragon.com](http://agentydragon.com) at [https://gitlab.com/agentydragon/solid-flask](https://gitlab.com/agentydragon/solid-flask)
+
 # CONTRIBUTORS
 
 Patrick Hochstenbach, `patrick.hochstenbach at ugent.be`
