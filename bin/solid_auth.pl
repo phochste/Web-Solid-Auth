@@ -4,6 +4,8 @@ $|++;
 use lib qw(./lib);
 use Getopt::Long qw(:config pass_through);
 use Web::Solid::Auth;
+use MIME::Base64;
+use JSON;
 use Path::Tiny;
 use String::Escape;
 use Log::Any::Adapter;
@@ -21,25 +23,35 @@ unless ($webid) {
     $webid = _get_cache();
 }
 
+my $ret;
+
 if (0) {}
 elsif ($cmd eq 'set') {
-    cmd_set(@ARGV);
+    $ret = cmd_set(@ARGV);
 }
 elsif ($cmd eq 'get') {
-    cmd_get(@ARGV);
+    $ret = cmd_get(@ARGV);
 }
 elsif ($cmd eq 'authenticate') {
-    cmd_authenticate(@ARGV);
+    $ret = cmd_authenticate(@ARGV);
 }
 elsif ($cmd eq 'headers') {
-    cmd_headers(@ARGV);
+    $ret = cmd_headers(@ARGV);
 }
 elsif ($cmd eq 'curl') {
-    cmd_curl(@ARGV);
+    $ret = cmd_curl(@ARGV);
+}
+elsif ($cmd eq 'id_token') {
+    $ret = cmd_id_token(@ARGV);
+}
+elsif ($cmd eq 'access_token') {
+    $ret = cmd_access_token(@ARGV);
 }
 else {
     usage();
 }
+
+exit($ret);
 
 sub usage {
     print STDERR <<EOF;
@@ -48,6 +60,8 @@ usage: $0 get
 usage: $0 [options] authenticate
 usage: $0 [options] headers METHOD URL
 usage: $0 [options] curl <...>
+usage: $0 access_token
+usage: $0 id_token
 
 options:
     --webid|w webid
@@ -66,6 +80,7 @@ sub cmd_set {
 
 sub cmd_get {
     print _get_cache() , "\n";
+    return 0;
 }
 
 sub cmd_authenticate {
@@ -82,6 +97,8 @@ sub cmd_authenticate {
     print "Starting callback server...\n";
 
     $auth->listen;
+
+    return 0;
 }
 
 sub cmd_headers {
@@ -92,6 +109,8 @@ sub cmd_headers {
     my $headers = _headers($method,$url);
 
     print "$headers\n";
+
+    return 0;
 }
 
 sub cmd_curl {
@@ -114,6 +133,66 @@ sub cmd_curl {
     my $headers = _headers($method,$url);
     my $opts    = join(" ",@rest);
     system("curl $headers $opts") == 0;
+}
+
+sub cmd_access_token {
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+
+    my $access = $auth->get_access_token;
+
+    unless ($access && $access->{access_token}) {
+        print STDERR "No access_token found. You are not logged in yet?\n";
+        return 2;
+    }
+
+    my $token = $access->{access_token};
+
+    my ($header,$payload,$signature) = split(/\./,$token,3);
+
+    unless ($header && $payload, $signature) {
+        printf STDERR "Token is not a jwt token\n";
+    }
+
+    my $json = JSON->new->pretty;
+
+    $header  = JSON::decode_json(MIME::Base64::decode_base64url($header));
+    $payload = JSON::decode_json(MIME::Base64::decode_base64url($payload));
+
+    printf "Header: %s\n" , $json->encode($header);
+    printf "Payload: %s\n" , $json->encode($payload);
+    printf "Signature: (binary data)\n", MIME::Base64::decode_base64url($signature);
+
+    return 0;
+}
+
+sub cmd_id_token {
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+
+    my $access = $auth->get_access_token;
+
+    unless ($access && $access->{id_token}) {
+        print STDERR "No access_token found. You are not logged in yet?\n";
+        return 2;
+    }
+
+    my $token = $access->{id_token};
+
+    my ($header,$payload,$signature) = split(/\./,$token,3);
+
+    unless ($header && $payload, $signature) {
+        printf STDERR "Token is not a jwt token\n";
+    }
+
+    my $json = JSON->new->pretty;
+
+    $header  = JSON::decode_json(MIME::Base64::decode_base64url($header));
+    $payload = JSON::decode_json(MIME::Base64::decode_base64url($payload));
+
+    printf "Header: %s\n" , $json->encode($header);
+    printf "Payload: %s\n" , $json->encode($payload);
+    printf "Signature: (binary data)\n", MIME::Base64::decode_base64url($signature);
+
+    return 0;
 }
 
 sub _get_cache {
