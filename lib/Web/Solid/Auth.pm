@@ -610,10 +610,6 @@ L<solid_auth.pl>
 This was very much inspired by the Python solid-flask code by
 Rai L<http://agentydragon.com> at L<https://gitlab.com/agentydragon/solid-flask>
 
-=head1 CONTRIBUTORS
-
-Patrick Hochstenbach, C<< patrick.hochstenbach at ugent.be >>
-
 =head1 COPYRIGHT AND LICENSE
 
 This software is copyright (c) 2021 by Patrick Hochstenbach.
