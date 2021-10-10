@@ -4,6 +4,24 @@ Web::Solid::Auth - A Perl Solid Web Client
 
 # SYNOPSIS
 
+    # Command line tools
+
+    # Set a default webid
+    bin/solid_auth.pl set https://pod.inrupt.com/hochstenbach/profile/card#me
+
+    # Login
+    bin/solid_auth.pl authententicate
+
+    # Use cURL for all other access to the POD
+    bin/solid_auth.pl curl -X GET https://pod.inrupt.com/hochstenbach/inbox
+
+    # Upload a document
+    bin/solid_auth.pl curl -X PUT \
+            -H "Content-Type: application/ld+json" \
+            -d "@myfile.jsonld" \
+            https://pod.inrupt.com/hochstenbach/public/myfile.jsonld 
+
+    # In a Perl program
     use Web::Solid::Auth;
     use Web::Solid::Auth::Listener;
 
