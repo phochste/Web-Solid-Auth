@@ -1,6 +1,8 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+
+0.4  2021-10-10 13:46:32 CEST
   - Supporting the newest ESS pods
   
 0.3  2021-02-28 08:36:51 CET
