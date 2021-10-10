@@ -17,6 +17,7 @@ use URI::Escape;
 use Plack::Request;
 use Plack::Response;
 use Web::Solid::Auth::Listener;
+use Web::Solid::Util;
 
 our $VERSION = "0.3";
 
@@ -43,6 +44,9 @@ has listener => (
 );
 has issuer => (
     is => 'lazy'
+);
+has client_id => (
+    is => 'ro',
 );
 
 sub _build_agent {
@@ -94,14 +98,6 @@ sub make_clean {
     $self;
 }
 
-sub make_client {
-    my $self = shift;
-    my $client_registration = $self->get_client_configuration;
-    return undef unless $client_registration;
-    $self->{client_id} = $client_registration->{client_id};
-    $self;
-}
-
 sub make_authorization_request {
     my $self = shift;
 
@@ -119,14 +115,14 @@ sub make_authorization_request {
     my $state          = $self->make_random_string;
 
     my $url = $self->make_url(
-      $authorization_endpoint, {
-        code_challenge          => $code_challenge ,
-        code_challenge_method   => 'S256' ,
-        state                   => $state ,
-        scope                   => 'openid profile offline_access' ,
-        client_id               => $client_id ,
-        response_type           => 'code' ,
-        redirect_uri            => $redirect_uri ,
+        $authorization_endpoint, {
+          code_challenge          => $code_challenge ,
+          code_challenge_method   => 'S256' ,
+          state                   => $state ,
+          scope                   => 'openid profile offline_access' ,
+          client_id               => $client_id ,
+          response_type           => 'code' ,
+          redirect_uri            => $redirect_uri ,
     });
 
     $self->{state}         = $state;
@@ -148,21 +144,50 @@ sub make_access_token {
     my $registration_conf = $self->get_client_configuration;
 
     my $token_endpoint    = $openid_conf->{token_endpoint};
+    my $token_endpoint_auth_methods_supported = $openid_conf->{token_endpoint_auth_methods_supported} // [];
+
+    # Make an array out of an string...
+    $token_endpoint_auth_methods_supported = 
+            ref($token_endpoint_auth_methods_supported) eq 'ARRAY' ?
+                $token_endpoint_auth_methods_supported :
+                [$token_endpoint_auth_methods_supported];
+
     my $client_id         = $registration_conf->{client_id};
+    my $client_secret     = $registration_conf->{client_secret};
 
     my $dpop_token = $self->make_token_for($token_endpoint,'POST');
 
     $self->log->info("requesting access token at $token_endpoint");
 
-    my $data = $self->post_json($token_endpoint, {
+    my $token_request  = {
         grant_type    => 'authorization_code' ,
         client_id     => $client_id ,
         redirect_uri  => $redirect_uri ,
         code          => $code ,
         code_verifier => $self->{code_verifier}
-    }, DPoP => $dpop_token);
+    };
+
+    my %headers = (
+        'Content-Type' => 'application/x-www-form-urlencoded' ,
+        DPoP => $dpop_token
+    );
+
+    if (grep(/^client_secret_basic/, @$token_endpoint_auth_methods_supported)) {
+        $self->log->info('using client_secret_basic');
+        $headers{'Authorization'} = 'Basic ' . MIME::Base64::encode_base64url("$client_id:$client_secret");
+    }
+    elsif (grep(/^client_secret_post/, @$token_endpoint_auth_methods_supported)) {
+        $self->log->info('using client_secret_post');
+        $token_request->{client_secret} = $client_secret;
+    }
+
+    my $data = $self->post( $token_endpoint, $token_request , %headers );
 
     return undef unless $data;
+
+    $data = decode_json($data);
+
+    $self->log->infof("received: %s", $data);
 
     my $cache_dir = $self->get_cache_dir;
     path($cache_dir)->mkpath unless -d $cache_dir;
@@ -236,6 +261,39 @@ sub get_openid_provider {
       }
     }
 
+    if ($issuer) {
+        return $issuer;
+    }
+    else {
+        # Try the webid to find the issuer
+        return $self->get_webid_openid_provider($webid);
+    }
+}
+
+sub get_webid_openid_provider {
+    my ($self, $webid) = @_;
+    $webid //= $self->webid;
+
+    # Lets try plain JSON parsing for fun..
+    my $res = $self->get($webid, 'Accept' => 'text/turtle');
+
+    return undef unless $res;
+
+    my $util  = Web::Solid::Util->new;
+    my $model = $util->parse_turtle($res);
+
+    my $sparql =<<EOF;
+SELECT ?oidcIssuer {
+    ?subject <http://www.w3.org/ns/solid/terms#oidcIssuer> ?oidcIssuer .
+}
+EOF
+
+    my $issuer;
+    $util->sparql($model, $sparql, sub {
+        my $res = shift;
+        $issuer = $res->value('oidcIssuer')->as_string;
+    });
+
     return $issuer;
 }
 
@@ -252,25 +310,37 @@ sub get_client_configuration {
     my $cache_file = path($cache_dir)->child("client.json")->stringify;
 
     unless (-f $cache_file) {
-        $self->log->info("registering client at $registration_endpoint");
+        if ($self->client_id) {
+            $self->log->info("using client document at " . $self->client_id);
 
-        # Dynamic register the client. We request the openid and profile
-        # scopes that are default for OpenID. The offline_access is
-        # to be able to request refresh_tokens (not yet implemented).
-        # The only safe response type is 'code' all other options send
-        # sensitive data over the front channel and shouldn't be used.
-        my $data = $self->post_json($registration_endpoint, {
-            grant_types      => ["authorization_code", "refresh_token"],
-            redirect_uris    => [ $redirect_uri ] ,
-            scope            => "openid profile offline_access" ,
-            response_types   => ["code"]
-        });
+            my $data = $self->get_json($self->client_id);
+            $self->log->debug("generating $cache_file");
 
-        return undef unless $data;
+            path("$cache_file")->spew(encode_json($data));
+        }
+        else {
+            $self->log->info("registering client at $registration_endpoint");
 
-        $self->log->debug("generating $cache_file");
+            # Dynamic register the client. We request the openid and profile
+            # scopes that are default for OpenID. The offline_access is
+            # to be able to request refresh_tokens (not yet implemented).
+            # The only safe response type is 'code' all other options send
+            # sensitive data over the front channel and shouldn't be used.
+            my $data = $self->post_json($registration_endpoint, {
+                grant_types      => ["authorization_code", "refresh_token"],
+                redirect_uris    => [ $redirect_uri ] ,
+                scope            => "openid profile offline_access" ,
+                response_types   => ["code"]
+            });
 
-        path("$cache_file")->spew(encode_json($data));
+            return undef unless $data;
+
+            $self->log->infof("received %s", $data);
+
+            $self->log->debug("generating $cache_file");
+
+            path("$cache_file")->spew(encode_json($data));
+        }
     }
 
     $self->log->debug("reading $cache_file");
@@ -301,6 +371,8 @@ sub get_openid_configuration {
         my $data = $self->get_json($url);
 
         return undef unless $data;
+
+        $self->log->infof("received %s", $data);
 
         $self->log->debug("generating $cache_file");
 
@@ -441,7 +513,11 @@ sub make_url {
 
 sub make_random_string {
     my $self = shift;
-    my $str = MIME::Base64::encode_base64url(Data::UUID->new->create());
+    my $str = MIME::Base64::encode_base64url(
+                    Data::UUID->new->create() .
+                    Data::UUID->new->create() .
+                    Data::UUID->new->create() 
+            );
     $str;
 }
 

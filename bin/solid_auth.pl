@@ -257,5 +257,11 @@ solid_auth.pl - A solid authentication tool
             -H "Content-Type: text/plain" \
             -d "abc" \
             https://hochstenbach.solidcommunity.net/public/
+    
+      # Add a file
+      solid_auth.pl curl -X PUT \
+            -H "Content-Type: application/ld+json" \
+            -d "@myfile.jsonld" \
+            https://hochstenbach.solidcommunity.net/public/myfile.jsonld 
 
 =cut
