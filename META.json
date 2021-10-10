@@ -37,6 +37,7 @@
       },
       "runtime" : {
          "requires" : {
+            "Attean" : "0",
             "Crypt::JWT" : "0",
             "Crypt::PK::ECC" : "0",
             "Data::UUID" : "0",
