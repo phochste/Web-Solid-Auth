@@ -1,4 +1,4 @@
-package Web::Solid::Util;
+package Web::Solid::Auth::Util;
 
 use Moo;
 use Attean;

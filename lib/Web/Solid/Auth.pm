@@ -17,7 +17,7 @@ use URI::Escape;
 use Plack::Request;
 use Plack::Response;
 use Web::Solid::Auth::Listener;
-use Web::Solid::Util;
+use Web::Solid::Auth::Util;
 
 our $VERSION = "0.4";
 
@@ -279,7 +279,7 @@ sub get_webid_openid_provider {
 
     return undef unless $res;
 
-    my $util  = Web::Solid::Util->new;
+    my $util  = Web::Solid::Auth::Util->new;
     my $model = $util->parse_turtle($res);
 
     my $sparql =<<EOF;
