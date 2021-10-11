@@ -50,8 +50,7 @@ has client_id => (
 );
 
 sub _build_agent {
-    my $ua     = new LWP::UserAgent;
-    my $agent  = "Web::Solid::Auth/$VERSION " . $ua->agent;
+    my $ua = WP::UserAgent->new(agent => "Web::Solid::Auth/$VERSION");
     $ua;
 }
 

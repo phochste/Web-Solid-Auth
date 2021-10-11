@@ -4,6 +4,7 @@ $|++;
 use lib qw(./lib);
 use Getopt::Long qw(:config pass_through);
 use Web::Solid::Auth;
+use Web::Solid::Auth::Agent;
 use MIME::Base64;
 use JSON;
 use Path::Tiny;
@@ -13,24 +14,34 @@ use Log::Any::Adapter;
 Log::Any::Adapter->set('Log4perl');
 Log::Log4perl::init('log4perl.conf');
 
-my $webid;
+my $webid = $ENV{SOLID_WEBID};
+my $webbase = $ENV{SOLID_BASE};
 
-GetOptions("webid|w=s" => \$webid);
+GetOptions(
+    "webid|w=s" => \$webid ,
+    "base|b=s"  => \$webbase);
 
 my $cmd = shift;
 
-unless ($webid) {
-    $webid = _get_cache();
+unless ($webid)  {
+    print STDERR "Need a webid or SOLID_WEBID environment variable\n\n";
+    usage();
 }
 
 my $ret;
 
 if (0) {}
-elsif ($cmd eq 'set') {
-    $ret = cmd_set(@ARGV);
-}
 elsif ($cmd eq 'get') {
     $ret = cmd_get(@ARGV);
+}
+elsif ($cmd eq 'put') {
+    $ret = cmd_put(@ARGV);
+}
+elsif ($cmd eq 'post') {
+    $ret = cmd_post(@ARGV);
+}
+elsif ($cmd eq 'delete') {
+    $ret = cmd_delete(@ARGV);
 }
 elsif ($cmd eq 'authenticate') {
     $ret = cmd_authenticate(@ARGV);
@@ -55,11 +66,21 @@ exit($ret);
 
 sub usage {
     print STDERR <<EOF;
-usage: $0 set webid
-usage: $0 get
+# Login
 usage: $0 [options] authenticate
+
+# Curl like interaction
 usage: $0 [options] headers METHOD URL
 usage: $0 [options] curl <...>
+
+# Simple HTTP interaction
+usage: $0 [options] get /path | url
+usage: $0 [options] put (/path/ | url)   # create a folder 
+usage: $0 [options] put (/path | url) file mimeType
+usage: $0 [options] post (/path | url) file mimeType
+usage: $0 [options] delete /path | url
+
+# Check the credentials
 usage: $0 access_token
 usage: $0 id_token
 
@@ -70,22 +91,145 @@ EOF
     exit 1
 }
 
-sub cmd_set {
-    my $webid = shift;
+sub cmd_get {
+    my ($url) = @_;
 
-    usage() unless $webid;
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
 
-    _set_cache($webid);
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+    my $agent = Web::Solid::Auth::Agent->new(
+        auth => $auth
+    );
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->get($iri);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    print $response->decoded_content;
+
+    return 0;
 }
 
-sub cmd_get {
-    print _get_cache() , "\n";
+sub cmd_put {
+    my ($url, $file, $mimeType) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
+
+    if ($url =~ /\/$/ && ($file || $mimeType)) {
+        print STDERR "Folder names can't have file uploads\n\n";
+        usage();
+    }
+    elsif ($url !~ /\/$/ && ! ($file || $mimeType)) {
+        print STDERR "Need url file and mimeType\n\n";
+        usage();
+    }
+
+    my $data;
+    
+    if ($file) {
+        $data = path($file)->slurp_raw;
+    }
+
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+    my $agent = Web::Solid::Auth::Agent->new(
+        auth => $auth
+    );
+
+    my $iri = _make_url($url);
+
+    my $response;
+
+    if ($file) {
+        $response = $agent->put($iri, $data, 'Content-Type' => $mimeType);
+    }
+    else {
+        $response = $agent->put($iri);
+    }
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    print STDERR $response->decoded_content , "\n";
+
+    return 0;
+}
+
+sub cmd_post {
+    my ($url, $file, $mimeType) = @_;
+
+    unless ($url && $file && -r $file && $mimeType) {
+        print STDERR "Need url file and mimeType\n\n";
+        usage();
+    }
+
+    my $data = path($file)->slurp_raw;
+
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+    my $agent = Web::Solid::Auth::Agent->new(
+        auth => $auth
+    );
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->post($iri, $data, 'Content-Type' => $mimeType);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    print STDERR $response->decoded_content , "\n";
+
+    print $response->header('Location') , "\n";
+
+    return 0;
+}
+
+sub cmd_delete {
+    my ($url) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
+
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+    my $agent = Web::Solid::Auth::Agent->new(
+        auth => $auth
+    );
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->delete($iri);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    print STDERR $response->decoded_content , "\n";
+
     return 0;
 }
 
 sub cmd_authenticate {
-    usage() unless $webid;
-
     my $auth = Web::Solid::Auth->new(webid => $webid);
 
     $auth->make_clean;
@@ -195,19 +339,14 @@ sub cmd_id_token {
     return 0;
 }
 
-sub _get_cache {
-    my $auth = Web::Solid::Auth->new(webid => 'urn:nobody');
-    my $cache = $auth->cache;
-    return undef unless path("$cache")->child("default")->exists;
-    path("$cache")->child("default")->slurp;
-}
+sub _make_url {
+    my $url = shift;
 
-sub _set_cache {
-    my $webid = shift;
+    return $url unless defined($webbase);
 
-    my $auth = Web::Solid::Auth->new(webid => 'urn:nobody');
-    my $cache = $auth->cache;
-    path("$cache")->child("default")->spew($webid);
+    return $url unless $url =~ /^\.?(\/.*)/;
+
+    return "$webbase$1";
 }
 
 sub _headers {
@@ -241,27 +380,33 @@ solid_auth.pl - A solid authentication tool
 =head1 SYNOPSIS
 
       # Set your default webid
-      solid_auth.pl set https://hochstenbach.solidcommunity.net/profile/card#me
+      export SOLID_WEBID=https://hochstenbach.inrupt.net/profile/card#me
 
       # Authentication to a pod
       solid_auth.pl authenticate
 
       # Get the http headers for a authenticated request
-      solid_auth.pl headers GET https://hochstenbach.solidcommunity.net/inbox
+      solid_auth.pl headers GET https://hochstenbach.inrupt.net/inbox/
 
       # Act like a curl command and fetch authenticated content
-      solid_auth.pl curl -X GET https://hochstenbach.solidcommunity.net/inbox
+      solid_auth.pl curl -X GET https://hochstenbach.inrupt.net/inbox/
 
       # Add some data
       solid_auth.pl curl -X POST \
             -H "Content-Type: text/plain" \
             -d "abc" \
-            https://hochstenbach.solidcommunity.net/public/
+            https://hochstenbach.inrupt.net/public/
     
       # Add a file
       solid_auth.pl curl -X PUT \
             -H "Content-Type: application/ld+json" \
             -d "@myfile.jsonld" \
-            https://hochstenbach.solidcommunity.net/public/myfile.jsonld 
+            https://hochstenbach.inrupt.net/public/myfile.jsonld 
+
+      # Set a solid base url
+      export SOLID_WEBBASE=https://hochstenbach.inrupt.net
+
+      # Get some data
+      solid_auth.pl get /inbox/
 
 =cut
