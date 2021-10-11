@@ -1,6 +1,9 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+  - Adding Solid::Web::Auth::Agent as Authenticated DPoP enabled agent 
+  - Adding more tools in bin/solid_auth.pl to actually do something with the pods
+  - Adding folder listing on pod
 
 0.4  2021-10-10 13:46:32 CEST
   - Supporting the newest ESS pods

@@ -33,6 +33,9 @@ Web::Solid::Auth - A Perl Solid Web Client
     # Set a solid base url
     export SOLID_WEBBASE=https://hochstenbach.inrupt.net
 
+    # List all resources on some Pod path
+    solid_auth.pl list /public/
+
     # Get some data
     solid_auth.pl get /inbox/
 

@@ -5,6 +5,7 @@ use lib qw(./lib);
 use Getopt::Long qw(:config pass_through);
 use Web::Solid::Auth;
 use Web::Solid::Auth::Agent;
+use Web::Solid::Auth::Util;
 use MIME::Base64;
 use JSON;
 use Path::Tiny;
@@ -31,6 +32,9 @@ unless ($webid)  {
 my $ret;
 
 if (0) {}
+elsif ($cmd eq 'list') {
+    $ret = cmd_list(@ARGV);
+}
 elsif ($cmd eq 'get') {
     $ret = cmd_get(@ARGV);
 }
@@ -73,6 +77,9 @@ usage: $0 [options] authenticate
 usage: $0 [options] headers METHOD URL
 usage: $0 [options] curl <...>
 
+# Interpret LDP responses
+usage: $0 [options] list /path/ | url    # folder listing
+
 # Simple HTTP interaction
 usage: $0 [options] get /path | url
 usage: $0 [options] put (/path/ | url)   # create a folder 
@@ -89,6 +96,57 @@ options:
 
 EOF
     exit 1
+}
+
+sub cmd_list {
+    my ($url) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
+
+    my $auth = Web::Solid::Auth->new(webid => $webid);
+    my $agent = Web::Solid::Auth::Agent->new(
+        auth => $auth
+    );
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->get($iri);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    my $util  = Web::Solid::Auth::Util->new;
+    my $model = $util->parse_turtle($response->decoded_content);
+
+    my $sparql =<<EOF;
+SELECT ?folder {
+    ?folder a <http://www.w3.org/ns/ldp#Container> .
+}
+EOF
+
+    $util->sparql($model, $sparql, sub {
+        my $res = shift;
+        my $name = $res->value('folder')->as_string; 
+        printf "d $url%s\n" , $name;
+    });
+
+    my $sparql =<<EOF;
+SELECT ?resource {
+    ?resource a <http://www.w3.org/ns/ldp#Resource> .
+}
+EOF
+
+    $util->sparql($model, $sparql, sub {
+        my $res = shift;
+        my $name = $res->value('resource')->as_string; 
+        printf "- $url%s\n" , $name; 
+    });
 }
 
 sub cmd_get {
@@ -344,7 +402,7 @@ sub _make_url {
 
     return $url unless defined($webbase);
 
-    return $url unless $url =~ /^\.?(\/.*)/;
+    return $url unless $url =~ /^\.?(\/.*)?/;
 
     return "$webbase$1";
 }
@@ -405,6 +463,9 @@ solid_auth.pl - A solid authentication tool
 
       # Set a solid base url
       export SOLID_WEBBASE=https://hochstenbach.inrupt.net
+
+      # List all resources on some Pod path
+      solid_auth.pl list /public/
 
       # Get some data
       solid_auth.pl get /inbox/
