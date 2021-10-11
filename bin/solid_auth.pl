@@ -15,12 +15,15 @@ use Log::Any::Adapter;
 Log::Any::Adapter->set('Log4perl');
 Log::Log4perl::init('log4perl.conf');
 
-my $webid = $ENV{SOLID_WEBID};
-my $webbase = $ENV{SOLID_BASE};
+my $webid    = $ENV{SOLID_WEBID};
+my $webbase  = $ENV{SOLID_REMOTE_BASE};
+my $clientid = $ENV{SOLID_CLIENT_ID}
 
 GetOptions(
-    "webid|w=s" => \$webid ,
-    "base|b=s"  => \$webbase);
+    "clientid|c=s" => \$clientid ,
+    "webid|w=s"    => \$webid ,
+    "base|b=s"     => \$webbase ,
+);
 
 my $cmd = shift;
 
@@ -92,11 +95,16 @@ usage: $0 access_token
 usage: $0 id_token
 
 options:
-    --webid|w webid
+    --webid|w webid          - your webid
+    --clientid|c clientid    - optional the client-id
+    --base|b base            - optional the base url for all requests
 
 EOF
     exit 1
 }
+
+my $auth = Web::Solid::Auth->new(webid => $webid);
+my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
 
 sub cmd_list {
     my ($url) = @_;
@@ -105,11 +113,6 @@ sub cmd_list {
         print STDERR "Need a url\n\n";
         usage();
     }
-
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-    my $agent = Web::Solid::Auth::Agent->new(
-        auth => $auth
-    );
 
     my $iri = _make_url($url);
 
@@ -157,11 +160,6 @@ sub cmd_get {
         usage();
     }
 
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-    my $agent = Web::Solid::Auth::Agent->new(
-        auth => $auth
-    );
-
     my $iri = _make_url($url);
 
     my $response = $agent->get($iri);
@@ -200,11 +198,6 @@ sub cmd_put {
         $data = path($file)->slurp_raw;
     }
 
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-    my $agent = Web::Solid::Auth::Agent->new(
-        auth => $auth
-    );
-
     my $iri = _make_url($url);
 
     my $response;
@@ -237,11 +230,6 @@ sub cmd_post {
 
     my $data = path($file)->slurp_raw;
 
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-    my $agent = Web::Solid::Auth::Agent->new(
-        auth => $auth
-    );
-
     my $iri = _make_url($url);
 
     my $response = $agent->post($iri, $data, 'Content-Type' => $mimeType);
@@ -267,11 +255,6 @@ sub cmd_delete {
         usage();
     }
 
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-    my $agent = Web::Solid::Auth::Agent->new(
-        auth => $auth
-    );
-
     my $iri = _make_url($url);
 
     my $response = $agent->delete($iri);
@@ -288,8 +271,6 @@ sub cmd_delete {
 }
 
 sub cmd_authenticate {
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-
     $auth->make_clean;
 
     my $auth_url = $auth->make_authorization_request;
@@ -338,8 +319,6 @@ sub cmd_curl {
 }
 
 sub cmd_access_token {
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-
     my $access = $auth->get_access_token;
 
     unless ($access && $access->{access_token}) {
@@ -368,8 +347,6 @@ sub cmd_access_token {
 }
 
 sub cmd_id_token {
-    my $auth = Web::Solid::Auth->new(webid => $webid);
-
     my $access = $auth->get_access_token;
 
     unless ($access && $access->{id_token}) {
@@ -410,9 +387,7 @@ sub _make_url {
 sub _headers {
     my ($method,$url) = @_;
 
-    $webid    //= $url;
-
-    my $auth    = Web::Solid::Auth->new(webid => $webid);
+    $webid //= $url;
 
     my $headers = $auth->make_authentication_headers($url,$method);
 
@@ -462,7 +437,7 @@ solid_auth.pl - A solid authentication tool
             https://hochstenbach.inrupt.net/public/myfile.jsonld 
 
       # Set a solid base url
-      export SOLID_WEBBASE=https://hochstenbach.inrupt.net
+      export SOLID_REMOTE_BASE=https://hochstenbach.inrupt.net
 
       # List all resources on some Pod path
       solid_auth.pl list /public/
