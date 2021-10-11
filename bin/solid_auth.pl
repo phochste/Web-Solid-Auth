@@ -409,4 +409,16 @@ solid_auth.pl - A solid authentication tool
       # Get some data
       solid_auth.pl get /inbox/
 
+      # Post some data
+      solid_auth.pl post /inbox/ myfile.jsonld "application/ld+json"
+
+      # Put some data
+      solid_auth.pl put /public/myfile.txt myfile.txt "text/plain"
+
+      # Create a folder
+      solid_auth.pl put /public/mytestfolder/
+
+      # Delete some data
+      solid_auth.pl delete /public/myfile.txt
+
 =cut
