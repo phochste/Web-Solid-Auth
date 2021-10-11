@@ -31,7 +31,7 @@ Web::Solid::Auth - A Perl Solid Web Client
             https://hochstenbach.inrupt.net/public/myfile.jsonld 
 
     # Set a solid base url
-    export SOLID_WEBBASE=https://hochstenbach.inrupt.net
+    export SOLID_REMOTE_BASE=https://hochstenbach.inrupt.net
 
     # List all resources on some Pod path
     solid_auth.pl list /public/
@@ -147,7 +147,8 @@ Check out the `example` directory for a demo web application.
 # INSPIRATION
 
 This was very much inspired by the Python solid-flask code by
-Rai [http://agentydragon.com](http://agentydragon.com) at [https://gitlab.com/agentydragon/solid-flask](https://gitlab.com/agentydragon/solid-flask)
+Rai [http://agentydragon.com](http://agentydragon.com) at [https://gitlab.com/agentydragon/solid-flask](https://gitlab.com/agentydragon/solid-flask),
+and Jeff Zucker's &lt;https://github.com/jeff-zucker> Solid-Shell at [https://www.npmjs.com/package/solid-shell](https://www.npmjs.com/package/solid-shell).
 
 # COPYRIGHT AND LICENSE
 
