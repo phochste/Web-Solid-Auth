@@ -17,7 +17,7 @@ Log::Log4perl::init('log4perl.conf');
 
 my $webid    = $ENV{SOLID_WEBID};
 my $webbase  = $ENV{SOLID_REMOTE_BASE};
-my $clientid = $ENV{SOLID_CLIENT_ID}
+my $clientid = $ENV{SOLID_CLIENT_ID};
 
 GetOptions(
     "clientid|c=s" => \$clientid ,
@@ -31,6 +31,9 @@ unless ($webid)  {
     print STDERR "Need a webid or SOLID_WEBID environment variable\n\n";
     usage();
 }
+
+my $auth = Web::Solid::Auth->new(webid => $webid);
+my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
 
 my $ret;
 
@@ -49,6 +52,12 @@ elsif ($cmd eq 'post') {
 }
 elsif ($cmd eq 'delete') {
     $ret = cmd_delete(@ARGV);
+}
+elsif ($cmd eq 'head') {
+    $ret = cmd_head(@ARGV);
+}
+elsif ($cmd eq 'options') {
+    $ret = cmd_options(@ARGV);
 }
 elsif ($cmd eq 'authenticate') {
     $ret = cmd_authenticate(@ARGV);
@@ -88,6 +97,8 @@ usage: $0 [options] get /path | url
 usage: $0 [options] put (/path/ | url)   # create a folder 
 usage: $0 [options] put (/path | url) file mimeType
 usage: $0 [options] post (/path | url) file mimeType
+usage: $0 [options] head /path | url
+usage: $0 [options] options /path | url
 usage: $0 [options] delete /path | url
 
 # Check the credentials
@@ -102,9 +113,6 @@ options:
 EOF
     exit 1
 }
-
-my $auth = Web::Solid::Auth->new(webid => $webid);
-my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
 
 sub cmd_list {
     my ($url) = @_;
@@ -128,28 +136,34 @@ sub cmd_list {
     my $model = $util->parse_turtle($response->decoded_content);
 
     my $sparql =<<EOF;
-SELECT ?folder {
-    ?folder a <http://www.w3.org/ns/ldp#Container> .
+prefix ldp: <http://www.w3.org/ns/ldp#> 
+
+SELECT ?folder ?type {
+    ?folder a ?type .
+    FILTER (?type IN (ldp:BasicContainer, 
+                      ldp:Container,
+                      ldp:Resource,
+                      ldp:NonRDFSource
+                      ) 
+            )
 }
 EOF
+
+    my %FILES;
 
     $util->sparql($model, $sparql, sub {
         my $res = shift;
         my $name = $res->value('folder')->as_string; 
-        printf "d $url%s\n" , $name;
+        my $type = $res->value('type')->as_string;
+        
+        $FILES{$url . $name} = $type =~ /Container/ ? "container" : "resource";
     });
 
-    my $sparql =<<EOF;
-SELECT ?resource {
-    ?resource a <http://www.w3.org/ns/ldp#Resource> .
-}
-EOF
+    for my $file (sort keys %FILES) {
+        my $type = $FILES{$file};
 
-    $util->sparql($model, $sparql, sub {
-        my $res = shift;
-        my $name = $res->value('resource')->as_string; 
-        printf "- $url%s\n" , $name; 
-    });
+        printf "%s $file\n" , $type eq 'container' ? "d" : "-";
+    }
 }
 
 sub cmd_get {
@@ -171,6 +185,56 @@ sub cmd_get {
     }
 
     print $response->decoded_content;
+
+    return 0;
+}
+
+sub cmd_head {
+    my ($url) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->head($iri);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    for my $header ($response->header_field_names) {
+        printf "%s: %s\n" , $header , $response->header($header);
+    }
+
+    return 0;
+}
+
+sub cmd_options {
+    my ($url) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n\n";
+        usage();
+    }
+
+    my $iri = _make_url($url);
+
+    my $response = $agent->options($iri);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    for my $header ($response->header_field_names) {
+        printf "%s: %s\n" , $header , $response->header($header);
+    }
 
     return 0;
 }

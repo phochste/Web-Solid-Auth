@@ -18,9 +18,19 @@ sub get {
 
 sub head {
     my ($self, $url , %opts ) = @_;
-    my $headers = $self->auth->make_authentication_headers($url,'POST');
+    my $headers = $self->auth->make_authentication_headers($url,'HEAD');
     %opts = (%opts, %$headers) if $headers;
     return $self->SUPER::head($url,%opts);
+}
+
+sub options {
+    require HTTP::Request::Common;
+    my ($self, $url , %opts ) = @_;
+    my $headers = $self->auth->make_authentication_headers($url,'OPTIONS');
+    %opts = (%opts, %$headers) if $headers;
+    my @parameters = ($url, %opts);
+    my @suff = $self->_process_colonic_headers(\@parameters,1);
+    return $self->request( HTTP::Request::Common::OPTIONS( @parameters ), @suff );
 }
 
 sub delete {

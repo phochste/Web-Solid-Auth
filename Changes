@@ -1,6 +1,8 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+  - Adding support for head, options in the command line and Agent
+  - Fixing the remote client
 
 0.5  2021-10-11 09:45:37 CEST
   - Adding Solid::Web::Auth::Agent as Authenticated DPoP enabled agent 
