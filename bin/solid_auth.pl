@@ -6,6 +6,7 @@ use Getopt::Long qw(:config pass_through);
 use Web::Solid::Auth;
 use Web::Solid::Auth::Agent;
 use Web::Solid::Auth::Util;
+use HTTP::Date;
 use MIME::Base64;
 use JSON;
 use Path::Tiny;
@@ -18,11 +19,15 @@ Log::Log4perl::init('log4perl.conf');
 my $webid    = $ENV{SOLID_WEBID};
 my $webbase  = $ENV{SOLID_REMOTE_BASE};
 my $clientid = $ENV{SOLID_CLIENT_ID};
+my $opt_recursive = undef;
+my $opt_skip      = undef;
 
 GetOptions(
     "clientid|c=s" => \$clientid ,
     "webid|w=s"    => \$webid ,
     "base|b=s"     => \$webbase ,
+    "r"            => \$opt_recursive ,
+    "skip"         => \$opt_skip ,
 );
 
 my $cmd = shift;
@@ -59,6 +64,9 @@ elsif ($cmd eq 'head') {
 elsif ($cmd eq 'options') {
     $ret = cmd_options(@ARGV);
 }
+elsif ($cmd eq 'mirror') {
+    $ret = cmd_mirror(@ARGV);
+}
 elsif ($cmd eq 'authenticate') {
     $ret = cmd_authenticate(@ARGV);
 }
@@ -82,6 +90,9 @@ exit($ret);
 
 sub usage {
     print STDERR <<EOF;
+Usage
+-=-=-=
+
 # Login
 usage: $0 [options] authenticate
 
@@ -90,11 +101,12 @@ usage: $0 [options] headers METHOD URL
 usage: $0 [options] curl <...>
 
 # Interpret LDP responses
-usage: $0 [options] list /path/ | url    # folder listing
+usage: $0 [options] list /path/ | url        # folder listing
+usage: $0 [options] mirror /path directory   # mirror a container/resource
 
 # Simple HTTP interaction
 usage: $0 [options] get /path | url
-usage: $0 [options] put (/path/ | url)   # create a folder 
+usage: $0 [options] put (/path/ | url)       # create a folder 
 usage: $0 [options] put (/path | url) file mimeType
 usage: $0 [options] post (/path | url) file mimeType
 usage: $0 [options] head /path | url
@@ -117,9 +129,30 @@ EOF
 sub cmd_list {
     my ($url) = @_;
 
+    my $files = _cmd_list($url);
+
+    return $files if $files && ref($files) eq '';
+
+    for my $file (sort keys %$files) {
+        my $type = $files->{$file};
+
+        printf "%s $file\n" , $type eq 'container' ? "d" : "-";
+    }
+
+    return 0;
+}
+
+sub _cmd_list {
+    my ($url) = @_;
+
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
+    }
+
+    unless ($url =~ /\/$/) {
+        print STDERR "$url doesn't look like a container\n";
+        return 1;
     }
 
     my $iri = _make_url($url);
@@ -154,29 +187,38 @@ EOF
     $util->sparql($model, $sparql, sub {
         my $res = shift;
         my $name = $res->value('folder')->as_string; 
+        $name =~ s/^\///; 
         my $type = $res->value('type')->as_string;
-        
+
         $FILES{$url . $name} = $type =~ /Container/ ? "container" : "resource";
     });
 
-    for my $file (sort keys %FILES) {
-        my $type = $FILES{$file};
-
-        printf "%s $file\n" , $type eq 'container' ? "d" : "-";
-    }
+    return \%FILES;
 }
 
 sub cmd_get {
-    my ($url) = @_;
+    my ($url) = @_; 
+
+    my $response = _cmd_get($url);
+
+    return $response if $response && ref($response) eq '';
+
+    print $response->decoded_content;
+
+    return 0;
+}
+
+sub _cmd_get {
+    my ($url,%headers) = @_;
 
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
     }
 
     my $iri = _make_url($url);
 
-    my $response = $agent->get($iri);
+    my $response = $agent->get($iri,%headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
@@ -184,17 +226,15 @@ sub cmd_get {
         return 2;
     }
 
-    print $response->decoded_content;
-
-    return 0;
+    $response;
 }
 
 sub cmd_head {
     my ($url) = @_;
 
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
     }
 
     my $iri = _make_url($url);
@@ -218,8 +258,8 @@ sub cmd_options {
     my ($url) = @_;
 
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
     }
 
     my $iri = _make_url($url);
@@ -243,8 +283,8 @@ sub cmd_put {
     my ($url, $file, $mimeType) = @_;
 
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
     }
 
     if ($url =~ /\/$/ && ($file || $mimeType)) {
@@ -252,7 +292,7 @@ sub cmd_put {
         usage();
     }
     elsif ($url !~ /\/$/ && ! ($file || $mimeType)) {
-        print STDERR "Need url file and mimeType\n\n";
+        print STDERR "Need url file and mimeType\n";
         usage();
     }
 
@@ -288,8 +328,8 @@ sub cmd_post {
     my ($url, $file, $mimeType) = @_;
 
     unless ($url && $file && -r $file && $mimeType) {
-        print STDERR "Need url file and mimeType\n\n";
-        usage();
+        print STDERR "Need url file and mimeType\n";
+        return 1;
     }
 
     my $data = path($file)->slurp_raw;
@@ -315,8 +355,8 @@ sub cmd_delete {
     my ($url) = @_;
 
     unless ($url) {
-        print STDERR "Need a url\n\n";
-        usage();
+        print STDERR "Need a url\n";
+        return 1;
     }
 
     my $iri = _make_url($url);
@@ -330,6 +370,70 @@ sub cmd_delete {
     }
 
     print STDERR $response->decoded_content , "\n";
+
+    return 0;
+}
+
+sub cmd_mirror {
+    my ($url,$directory) = @_;
+
+    unless ($directory && -d $directory) {
+        print STDERR "Need a directory\n";
+        return 2;
+    }
+
+    if ($url =~ /\/$/) {
+        # ok we are a container
+    }
+    else {
+        return _cmd_mirror($url,$directory);
+    }
+
+    my $files = _cmd_list($url);
+
+    return $files if $files && ref($files) eq '';
+
+    for my $file (sort keys %$files) {
+        my $type = $files->{$file};
+        my $base = substr($file,length($url));
+        $base =~ s{\/$}{};
+        if ($type eq 'container') {
+            if ($file ne $url && $base !~ /^\./ && $opt_recursive) {
+                path("$directory/$base")->mkpath;
+                cmd_mirror($file,"$directory/$base");
+            }
+        }
+        else {
+            _cmd_mirror($file,$directory);
+        }
+    }
+}
+
+sub _cmd_mirror {
+    my ($url,$directory) = @_;
+
+    my $path = $url;
+    $path =~ s{.*\/}{};
+
+    print "$url -> $directory/$path\n";
+
+    my %headers = ();
+
+    if ($opt_skip && -e "$directory/$path" ) {
+        print STDERR "skipping $directory/$path - already exists\n";
+        return 0;
+    }
+
+    if (-e "$directory/$path") {
+        my ($mtime) = ( stat("$directory/$path") )[9];
+        $headers{'If-Modified-Since'} = HTTP::Date::time2str($mtime);
+    }
+
+    my $response = _cmd_get($url,%headers);
+
+    return $response unless $response && ref($response) ne '';
+
+    path("$directory/$path")->spew_raw($response->decoded_content);
 
     return 0;
 }
@@ -520,5 +624,8 @@ solid_auth.pl - A solid authentication tool
 
       # Delete some data
       solid_auth.pl delete /public/myfile.txt
+
+      # Mirror a resource, container or tree
+      solid_auth.pl mirror /public/ ./my_copy
 
 =cut

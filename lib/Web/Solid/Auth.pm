@@ -627,6 +627,9 @@ Web::Solid::Auth - A Perl Solid Web Client
     # Delete some data
     solid_auth.pl delete /public/myfile.txt
 
+    # Mirror a resource, container or tree
+    solid_auth.pl mirror /public/ ./my_copy
+
     # In a perl program
     use Web::Solid::Auth;
     use Web::Solid::Auth::Listener;
