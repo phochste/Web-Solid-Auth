@@ -5,6 +5,7 @@ on 'test', sub {
   requires 'Test::More', '1.001003';
   requires 'Test::Exception','0.32';
   requires 'Test::Pod','0';
+  requires 'Dist::Zilla::Plugin::ExecDir','0';
 };
 
 requires 'LWP::Protocol::https',0;
