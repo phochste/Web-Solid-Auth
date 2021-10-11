@@ -4,55 +4,6 @@ Web::Solid::Auth - A Perl Solid Web Client
 
 # SYNOPSIS
 
-    # On the command line
-
-    # Set your default webid
-    export SOLID_WEBID=https://hochstenbach.inrupt.net/profile/card#me
-
-    # Authentication to a pod
-    solid_auth.pl authenticate
-
-    # Get the http headers for a authenticated request
-    solid_auth.pl headers GET https://hochstenbach.inrupt.net/inbox/
-
-    # Act like a curl command and fetch authenticated content
-    solid_auth.pl curl -X GET https://hochstenbach.inrupt.net/inbox/
-
-    # Add some data
-    solid_auth.pl curl -X POST \
-            -H "Content-Type: text/plain" \
-            -d "abc" \
-            https://hochstenbach.inrupt.net/public/
-    
-    # Add a file
-    solid_auth.pl curl -X PUT \
-            -H "Content-Type: application/ld+json" \
-            -d "@myfile.jsonld" \
-            https://hochstenbach.inrupt.net/public/myfile.jsonld 
-
-    # Set a solid base url
-    export SOLID_WEBBASE=https://hochstenbach.inrupt.net
-
-    # List all resources on some Pod path
-    solid_auth.pl list /public/
-
-    # Get some data
-    solid_auth.pl get /inbox/
-
-    # Post some data
-    solid_auth.pl post /inbox/ myfile.jsonld "application/ld+json"
-
-    # Put some data
-    solid_auth.pl put /public/myfile.txt myfile.txt "text/plain"
-
-    # Create a folder
-    solid_auth.pl put /public/mytestfolder/
-
-    # Delete some data
-    solid_auth.pl delete /public/myfile.txt
-
-    # In a Perl program
-
     use Web::Solid::Auth;
     use Web::Solid::Auth::Listener;
 

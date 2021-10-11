@@ -6,7 +6,7 @@ use Plack::Request;
 use Plack::Response;
 use HTTP::Server::PSGI;
 
-our $VERSION = "0.4";
+our $VERSION = "0.5";
 
 has host => (
     is => 'ro' ,
