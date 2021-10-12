@@ -84,7 +84,7 @@
          "web" : "https://github.com/phochste/Web-Solid-Auth"
       }
    },
-   "version" : "0.6",
+   "version" : "0.7",
    "x_contributors" : [
       "Patrick Hochstenbach <Patrick.Hochstenbach@UGent.be>"
    ],
