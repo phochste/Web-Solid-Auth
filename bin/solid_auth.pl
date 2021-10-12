@@ -102,7 +102,7 @@ usage: $0 [options] curl <...>
 
 # Interpret LDP responses
 usage: $0 [options] list /path/ | url        # folder listing
-usage: $0 [options] mirror /path directory   # mirror a container/resource
+usage: $0 [options] mirror /path directory   # mirror a container/resource , use [-r] for recursice mirror
 
 # Simple HTTP interaction
 usage: $0 [options] get /path | url
@@ -626,6 +626,41 @@ solid_auth.pl - A solid authentication tool
       solid_auth.pl delete /public/myfile.txt
 
       # Mirror a resource, container or tree
-      solid_auth.pl mirror /public/ ./my_copy
+      mkdir /data/my_copy
+      solid_auth.pl -r mirror /public/ /data/my_copy
+
+=head1 ENVIRONMENT
+
+=over
+
+=item SOLID_WEBID
+
+Your WebId 
+
+=item SOLID_REMOTE_BASE
+
+The Base URL that is used for all delete, get, head, options post, put, patch requests
+
+=item SOLID_CLIENT_ID
+
+The URL to a static client configuration. See C<etc/web-solid-auth.jsonld> for an example.
+This file, edited for your own environment, needs to be published on some public accessible
+webserver.
+
+=back
+
+=head1 INSPIRATION
+
+This was very much inspired by the Python solid-flask code by
+Rai L<http://agentydragon.com> at L<https://gitlab.com/agentydragon/solid-flask>,
+and Jeff Zucker's <https://github.com/jeff-zucker> Solid-Shell at L<https://www.npmjs.com/package/solid-shell>.
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2021 by Patrick Hochstenbach.
+
+This is free software; you can redistribute it and/or modify it under the same terms as the Perl 5 programming language system itself.
+
+=encoding utf8
 
 =cut
