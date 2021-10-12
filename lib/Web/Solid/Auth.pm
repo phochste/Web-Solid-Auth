@@ -19,7 +19,7 @@ use Plack::Response;
 use Web::Solid::Auth::Listener;
 use Web::Solid::Auth::Util;
 
-our $VERSION = "0.6";
+our $VERSION = "0.7";
 
 has webid => (
     is => 'ro' ,
