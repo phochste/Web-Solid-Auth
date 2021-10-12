@@ -7,6 +7,7 @@ use Web::Solid::Auth;
 use Web::Solid::Auth::Agent;
 use Web::Solid::Auth::Util;
 use HTTP::Date;
+use File::LibMagic;
 use MIME::Base64;
 use JSON;
 use Path::Tiny;
@@ -21,13 +22,17 @@ my $webbase  = $ENV{SOLID_REMOTE_BASE};
 my $clientid = $ENV{SOLID_CLIENT_ID};
 my $opt_recursive = undef;
 my $opt_skip      = undef;
+my $opt_real      = undef;
+my $opt_keep      = undef;
 
 GetOptions(
     "clientid|c=s" => \$clientid ,
     "webid|w=s"    => \$webid ,
     "base|b=s"     => \$webbase ,
-    "r"            => \$opt_recursive ,
     "skip"         => \$opt_skip ,
+    "keep"         => \$opt_keep ,
+    "r"            => \$opt_recursive ,
+    "x"            => \$opt_real ,
 );
 
 my $cmd = shift;
@@ -67,6 +72,12 @@ elsif ($cmd eq 'options') {
 elsif ($cmd eq 'mirror') {
     $ret = cmd_mirror(@ARGV);
 }
+elsif ($cmd eq 'upload') {
+    $ret = cmd_upload(@ARGV);
+}
+elsif ($cmd eq 'clean') {
+    $ret = cmd_clean(@ARGV);
+}
 elsif ($cmd eq 'authenticate') {
     $ret = cmd_authenticate(@ARGV);
 }
@@ -102,13 +113,15 @@ usage: $0 [options] curl <...>
 
 # Interpret LDP responses
 usage: $0 [options] list /path/ | url        # folder listing
-usage: $0 [options] mirror /path directory   # mirror a container/resource , use [-r] for recursice mirror
+usage: $0 [options] mirror /path directory   # mirror a container/resource , use [-r] for recursive mirror
+usage: $0 [options] upload directory /path   # upload the directory contents to a path, use [-r] for recursive upload
+usage: $0 [options] clean /path              # delete resources/containers, use [-r] for recursive clean
 
 # Simple HTTP interaction
 usage: $0 [options] get /path | url
 usage: $0 [options] put (/path/ | url)       # create a folder 
-usage: $0 [options] put (/path | url) file mimeType
-usage: $0 [options] post (/path | url) file mimeType
+usage: $0 [options] put (/path | url) file [mimeType]
+usage: $0 [options] post (/path | url) file [mimeType]
 usage: $0 [options] head /path | url
 usage: $0 [options] options /path | url
 usage: $0 [options] delete /path | url
@@ -121,6 +134,10 @@ options:
     --webid|w webid          - your webid
     --clientid|c clientid    - optional the client-id
     --base|b base            - optional the base url for all requests
+    --skip                   - skip files that already exist (mirror)
+    --keep                   - keep containers (clean)
+    -r                       - recursive (mirror, upload, clean)
+    -x                       - do it for real (upload, clean)
 
 EOF
     exit 1
@@ -182,7 +199,7 @@ SELECT ?folder ?type {
 }
 EOF
 
-    my %FILES;
+    my %FILES = ();
 
     $util->sparql($model, $sparql, sub {
         my $res = shift;
@@ -190,7 +207,12 @@ EOF
         $name =~ s/^\///; 
         my $type = $res->value('type')->as_string;
 
-        $FILES{$url . $name} = $type =~ /Container/ ? "container" : "resource";
+        if ($FILES{$url . $name} && $FILES{$url . $name} eq 'container') {
+            # Containers are more interesting than resources
+        }
+        else {
+            $FILES{$url . $name} = $type =~ /Container/ ? "container" : "resource";
+        }
     });
 
     return \%FILES;
@@ -282,6 +304,8 @@ sub cmd_options {
 sub cmd_put {
     my ($url, $file, $mimeType) = @_;
 
+    $mimeType //= _guess_mimetype($file) if $file;
+
     unless ($url) {
         print STDERR "Need a url\n";
         return 1;
@@ -289,11 +313,11 @@ sub cmd_put {
 
     if ($url =~ /\/$/ && ($file || $mimeType)) {
         print STDERR "Folder names can't have file uploads\n\n";
-        usage();
+        return 1;
     }
     elsif ($url !~ /\/$/ && ! ($file || $mimeType)) {
         print STDERR "Need url file and mimeType\n";
-        usage();
+        return 1;
     }
 
     my $data;
@@ -326,6 +350,8 @@ sub cmd_put {
 
 sub cmd_post {
     my ($url, $file, $mimeType) = @_;
+
+    $mimeType //= _guess_mimetype($file) if $file;
 
     unless ($url && $file && -r $file && $mimeType) {
         print STDERR "Need url file and mimeType\n";
@@ -376,6 +402,11 @@ sub cmd_delete {
 
 sub cmd_mirror {
     my ($url,$directory) = @_;
+
+    unless ($url) {
+        print STDERR "Need a url\n";
+        return 2;
+    }
 
     unless ($directory && -d $directory) {
         print STDERR "Need a directory\n";
@@ -436,6 +467,118 @@ sub _cmd_mirror {
     path("$directory/$path")->spew_raw($response->decoded_content);
 
     return 0;
+}
+
+sub cmd_upload {
+    my ($directory,$url) = @_;
+
+    unless ($directory && -d $directory) {
+        print STDERR "Need a directory";
+        return 2;
+    }
+
+    unless ($url =~ /\/$/) {
+        print STDERR "Url doesn't look like a container";
+        return 2;
+    }
+
+    for my $file (glob("$directory/*")) {
+        my $upload_url;
+        my $upload_file = substr($file,length($directory) + 1);
+
+        if (-d $file) {
+            $upload_url = "$url$upload_file/";           
+        }
+        else {
+            $upload_url = "$url$upload_file";
+        }
+     
+        if ($opt_real) {
+            print "$file -> $upload_url\n";
+
+            if (-d $file) {
+                cmd_put($upload_url);
+            }
+            else {
+                cmd_put($upload_url,$file);
+            }
+        }
+        else {
+            print "$file -> $upload_url [test : use -x for real upload]\n";
+        }
+
+        if ($opt_recursive && -d $file) {
+            cmd_upload($file,$upload_url);
+        }
+    }
+}
+
+sub _crawl_container_url {
+    my ($url,$result) = @_;
+
+    $result //= {};
+
+    unless ($url && $url =~ /^\//) {
+        print STDERR "Need a container url\n";
+        return 2;
+    }
+
+    my $files = _cmd_list($url);
+
+    # return on error
+    return $files if $files && ref($files) eq '';
+
+    for my $file (sort { $b cmp $a } keys %$files) {
+        my $type = $files->{$file};
+
+        next if $file eq $url;
+
+        $result->{$file} = $type;
+
+        if ($type eq 'container') {
+            _crawl_container_url($file,$result);
+        }
+    }
+
+    return $result;
+}
+
+sub cmd_clean {
+    my ($url) = @_;
+
+    unless ($url && $url =~ /^\//) {
+        print STDERR "Need a container url\n";
+        return 2;
+    }
+
+    my $files;
+
+    if ($opt_recursive) {
+        $files = _crawl_container_url($url);
+    }
+    else {
+        $files = _cmd_list($url);
+
+    }
+
+    for my $file (sort { $b cmp $a } keys %$files) {
+        my $type = $files->{$file};
+
+        next if $file eq $url;
+
+        if ($opt_keep && $type eq 'container') {
+            print "skipping: $file\n";
+            next;
+        }
+
+        if ($opt_real) {
+            print "deleting: $file\n";
+            cmd_delete($file);
+        }
+        else {
+            print "deleting: $file [test : use -x for real upload]\n";
+        }
+    }
 }
 
 sub cmd_authenticate {
@@ -572,11 +715,37 @@ sub _headers {
     return join(" ",@headers);
 }
 
+sub _guess_mimetype {
+    my ($path) = @_;
+    
+    my $magic = File::LibMagic->new;
+
+    # My own MIME magic
+    return "text/turtle" if ($path =~ /\.ttl$/);
+    return "text/turtle" if ($path =~ /\.acl$/);
+    return "application/ld+json" if ($path =~ /\.jsonld$/);
+    return "text/n3" if ($path =~ /\.n3$/);
+    return "application/rdf+xml" if ($path =~ /\.rdf$/);
+
+    # If the file is empty 
+    if (! -e $path || -s $path) {
+        my $info = $magic->info_from_filename($path);
+        return $info->{mime_type};
+    }
+    else {
+        # Open the file and do magic guessing
+        open my $fh, '<', $path or die $!;
+        my $info = $magic->info_from_handle($fh);
+        close($fh);
+        return $info->{mime_type};
+    }
+}
+
 __END__
 
 =head1 NAME
 
-solid_auth.pl - A solid authentication tool
+solid_auth.pl - A Solid management tool
 
 =head1 SYNOPSIS
 
@@ -614,10 +783,10 @@ solid_auth.pl - A solid authentication tool
       solid_auth.pl get /inbox/
 
       # Post some data
-      solid_auth.pl post /inbox/ myfile.jsonld "application/ld+json"
+      solid_auth.pl post /inbox/ myfile.jsonld 
 
       # Put some data
-      solid_auth.pl put /public/myfile.txt myfile.txt "text/plain"
+      solid_auth.pl put /public/myfile.txt myfile.txt 
 
       # Create a folder
       solid_auth.pl put /public/mytestfolder/
@@ -629,23 +798,71 @@ solid_auth.pl - A solid authentication tool
       mkdir /data/my_copy
       solid_auth.pl -r mirror /public/ /data/my_copy
 
+      # Upload a directory to the pod
+      #  Add the -x option to do it for real (only a test without this option)
+      solid_auth.pl -r upload /data/my_copy /public/
+
+      # Clean all files in a container
+      #  Add the -x option to do it for real (only a test without this option)
+      solid_auth.pl --keep clean /demo/
+
+      # Clean a complete container 
+      #  Add the -x option to do it for real (only a test without this option)
+      solid_auth.pl -r clean /demo/
+
 =head1 ENVIRONMENT
 
 =over
 
 =item SOLID_WEBID
 
-Your WebId 
+Your WebId.
 
 =item SOLID_REMOTE_BASE
 
-The Base URL that is used for all delete, get, head, options post, put, patch requests
+The Base URL that is used for all delete, get, head, options post, put, patch requests.
 
 =item SOLID_CLIENT_ID
 
 The URL to a static client configuration. See C<etc/web-solid-auth.jsonld> for an example.
 This file, edited for your own environment, needs to be published on some public accessible
 webserver.
+
+=back
+
+=head1 CONFIGURATION
+
+=over
+
+=item --webid 
+
+Your WebId.
+
+=item --base
+
+The Base URL that is used for all delete, get, head, options post, put, patch requests.
+
+=item --clientid
+
+The URL to a static client configuration. See C<etc/web-solid-auth.jsonld> for an example.
+This file, edited for your own environment, needs to be published on some public accessible
+webserver.
+
+=item --skip
+
+Skip resources that already exist (mirror).
+
+=item --keep
+
+Keep containers when cleaning data (clean).
+
+=item -r
+
+Recursive (clean, mirror, upload).
+
+=item -x
+
+Do it for real. The commands C<clean> and C<upload> will run by default in safe mode.
 
 =back
 

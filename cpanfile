@@ -13,6 +13,7 @@ requires 'Crypt::JWT',0;
 requires 'Crypt::PK::ECC',0;
 requires 'Data::UUID',0;
 requires 'Digest::SHA',0;
+requires 'File::LibMagic',0;
 requires 'HTTP::Link',0;
 requires 'JSON',0;
 requires 'LWP::Protocol::https',0;

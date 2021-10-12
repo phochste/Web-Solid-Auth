@@ -616,10 +616,10 @@ Web::Solid::Auth - A Perl Solid Web Client
     solid_auth.pl get /inbox/
 
     # Post some data
-    solid_auth.pl post /inbox/ myfile.jsonld "application/ld+json"
+    solid_auth.pl post /inbox/ myfile.jsonld 
 
     # Put some data
-    solid_auth.pl put /public/myfile.txt myfile.txt "text/plain"
+    solid_auth.pl put /public/myfile.txt myfile.txt 
 
     # Create a folder
     solid_auth.pl put /public/mytestfolder/
@@ -629,6 +629,18 @@ Web::Solid::Auth - A Perl Solid Web Client
 
     # Mirror a resource, container or tree
     solid_auth.pl mirror /public/ ./my_copy
+
+    # Upload a directory to the pod
+    #  Add the -x option to do it for real (only a test without this option)
+    solid_auth.pl -r upload /data/my_copy /public/
+
+    # Clean all files in a container
+    #  Add the -x option to do it for real (only a test without this option)
+    solid_auth.pl --keep clean /demo/
+
+    # Clean a complete container 
+    #  Add the -x option to do it for real (only a test without this option)
+    solid_auth.pl -r clean /demo/
 
     # In a perl program
     use Web::Solid::Auth;
