@@ -28,6 +28,7 @@ my %module_build_args = (
     "Crypt::PK::ECC" => 0,
     "Data::UUID" => 0,
     "Digest::SHA" => 0,
+    "File::LibMagic" => 0,
     "HTTP::Link" => 0,
     "JSON" => 0,
     "LWP::Protocol::https" => 0,
