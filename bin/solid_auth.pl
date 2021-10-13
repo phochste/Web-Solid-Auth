@@ -190,9 +190,12 @@ prefix ldp: <http://www.w3.org/ns/ldp#>
 
 SELECT ?folder ?type {
     ?folder a ?type .
-    FILTER (?type IN (ldp:BasicContainer, 
-                      ldp:Container,
+    FILTER (?type IN (
                       ldp:Resource,
+                      ldp:RDFSource,
+                      ldp:Container,
+                      ldp:BasicContainer, 
+                      ldp:IndirectContainer,
                       ldp:NonRDFSource
                       ) 
             )
