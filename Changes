@@ -1,6 +1,7 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+  - Fixing missing ldf:RDFSource
 
 0.7  2021-10-12 11:34:40 CEST
   - Add a mirror Solid option
