@@ -15,7 +15,6 @@ use String::Escape;
 use Log::Any::Adapter;
 
 Log::Any::Adapter->set('Log4perl');
-Log::Log4perl::init('log4perl.conf');
 
 my $webid    = $ENV{SOLID_WEBID};
 my $webbase  = $ENV{SOLID_REMOTE_BASE};
@@ -24,6 +23,7 @@ my $opt_recursive = undef;
 my $opt_skip      = undef;
 my $opt_real      = undef;
 my $opt_keep      = undef;
+my $opt_log       = 'log4perl.conf';
 
 GetOptions(
     "clientid|c=s" => \$clientid ,
@@ -33,6 +33,7 @@ GetOptions(
     "keep"         => \$opt_keep ,
     "r"            => \$opt_recursive ,
     "x"            => \$opt_real ,
+    "log=s"        => \$opt_log ,
 );
 
 my $cmd = shift;
@@ -40,6 +41,10 @@ my $cmd = shift;
 unless ($webid)  {
     print STDERR "Need a webid or SOLID_WEBID environment variable\n\n";
     usage();
+}
+
+if (-e $opt_log) {
+    Log::Log4perl::init($opt_log);
 }
 
 my $auth = Web::Solid::Auth->new(webid => $webid);
