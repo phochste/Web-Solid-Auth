@@ -2,7 +2,9 @@ Revision history for Web::Solid::Auth
 
 {{$NEXT}}
   - Fixing relative/absolute URL bug
-  
+  - Adding support -- support to stop interpreting solid_auth.pl options
+  - Adding documentation for the sold_auth.pl commands
+   
 0.8  2021-10-14 09:10:19 CEST
   - Adding INSTALL instructions
   - Making the log4perl configuration file optional

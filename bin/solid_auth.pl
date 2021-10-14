@@ -883,6 +883,86 @@ Do it for real. The commands C<clean> and C<upload> will run by default in safe 
 
 =back
 
+=head1 COMMAND
+
+=over 
+
+=item authenticate
+
+Start an authentication process for your WebId. You will be presented with a 
+URL that you need to open in a webbrowser. After a successfull login the 
+command can be closed. 
+
+The webbrowser needs to be opened on the same host as the where you where you
+run the solid_auth.pl command. 
+
+=item headers METHOD URL
+
+Return the Authentication and DPoP headers for a HTTP C<METHOD> request to C<URL>.
+
+=item curl CURL-OPTS
+
+Execute a curl command with Authentication and DPoP headers added. Add a C<--> 
+option to the C<CURL-OPTS> to stop solid_auth.pl from interpreting Curl options.
+
+=item list URL
+
+List the resources in a LDP container at URL.
+
+=item mirror [-r] URL DIRECTORY
+
+Mirror the contents of a container to a local directory. Optional provide C<-r>
+option for recursive mirror.
+
+=item upload [-rx] DIRECTORY URL
+
+Upload a directorty to a container. Optional provide C<-r> option for recursive
+upload. With the C<-x> option, the command will run in demo mode.
+
+=item clean [-rx] [--keep] URL
+
+Clean all resources in a directory. Optional provide C<-r> option for recursive
+clean. With the C<-x> option, the command will run in demo mode. With the
+C<--keep> options all container will be kept.
+
+=item get URL
+
+Return the response of a HTTP GET request to URL.
+
+=item post URL FILE [MIMETYPE]
+
+Return the HTTP Message of a HTTP POST request of the FILE with MIMETYPE.
+Uses libmagic to guess the mimetype.
+
+=item put URL [FILE] [MIMETYPE]
+
+Return the HTTP Message of a HTTP PUT request of the FILE with MIMETYPE.
+Uses libmagic to guess the mimetype.
+
+When the URL ends with a slash (/), then a new container will be created.
+
+=item head URL
+
+Return the HTTP Header of a HTTP HEAD request to URL.
+
+=item head OPTIONS
+
+Return the HTTP Header of a HTTP OPTIONS request to URL.
+
+=item delete URL
+
+Return the HTTP Message of a HTTP DELETE request to URL.
+
+=item id_token
+
+Show the contents of the JWT id token.
+
+=item access_token
+
+Show the contents of the JWT access token.
+
+=back
+
 =head1 INSPIRATION
 
 This was very much inspired by the Python solid-flask code by
