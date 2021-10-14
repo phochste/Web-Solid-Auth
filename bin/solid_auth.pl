@@ -641,6 +641,11 @@ sub cmd_curl {
 sub cmd_access_token {
     my $access = $auth->get_access_token;
 
+    unless ($webid) {
+        print STDERR "Need a WebId or SOLID_WEBID environment variable\n";
+        return 2;
+    }
+    
     unless ($access && $access->{access_token}) {
         print STDERR "No access_token found. You are not logged in yet?\n";
         return 2;
@@ -715,7 +720,6 @@ sub _headers {
 
     unless ($headers) {
         print STDERR "No access tokens found for $webid. Maybe you need to authenticate first?\n";
-        exit 2;
     }
 
     my @headers = ();
