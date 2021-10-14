@@ -38,11 +38,6 @@ GetOptions(
 
 my $cmd = shift;
 
-unless ($webid)  {
-    print STDERR "Need a webid or SOLID_WEBID environment variable\n\n";
-    usage();
-}
-
 if (-e $opt_log) {
     Log::Log4perl::init($opt_log);
 }
@@ -590,6 +585,12 @@ sub cmd_clean {
 }
 
 sub cmd_authenticate {
+
+    unless ($webid) {
+        print STDERR "Need a WebId or SOLID_WEBID environment variable\n";
+        return 2;
+    }
+
     $auth->make_clean;
 
     my $auth_url = $auth->make_authorization_request;
@@ -695,6 +696,8 @@ sub cmd_id_token {
 
 sub _make_url {
     my $url = shift;
+
+    return $url if $url =~ /^http.*/;
 
     return $url unless defined($webbase);
 

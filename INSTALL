@@ -13,7 +13,7 @@ sudo apt-get install libmagic-dev
 On Red Hat run:
 
 ```
-sudo yum install file-devel
+sudo yum install file-devel file-libs
 ```
 
 On Mac you can use homebrew (https://brew.sh/):

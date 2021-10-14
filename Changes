@@ -1,7 +1,8 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
-
+  - Fixing relative/absolute URL bug
+  
 0.8  2021-10-14 09:10:19 CEST
   - Adding INSTALL instructions
   - Making the log4perl configuration file optional
