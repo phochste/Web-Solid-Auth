@@ -624,6 +624,8 @@ sub cmd_curl {
     my $method = 'GET';
     my $url = $rest[-1];
 
+    shift @rest if @rest[0] eq '--';
+
     if (@rest) {
         for (my $i = 0 ; $i < @rest ; $i++) {
             if ($rest[$i] eq '-X') {
@@ -774,16 +776,16 @@ solid_auth.pl - A Solid management tool
       solid_auth.pl headers GET https://timbl.inrupt.net/inbox/
 
       # Act like a curl command and fetch authenticated content
-      solid_auth.pl curl -X GET https://timbl.inrupt.net/inbox/
+      solid_auth.pl curl -- -X GET https://timbl.inrupt.net/inbox/
 
       # Add some data
-      solid_auth.pl curl -X POST \
+      solid_auth.pl curl -- -X POST \
             -H "Content-Type: text/plain" \
             -d "abc" \
             https://timbl.inrupt.net/public/
     
       # Add a file
-      solid_auth.pl curl -X PUT \
+      solid_auth.pl curl -- -X PUT \
             -H "Content-Type: application/ld+json" \
             -d "@myfile.jsonld" \
             https://timbl.inrupt.net/public/myfile.jsonld 
