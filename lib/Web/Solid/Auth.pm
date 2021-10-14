@@ -686,6 +686,11 @@ Web::Solid::Auth - A Perl Solid Web Client
         #..do you curl..lwp::agent..or what ever with the headers
     }
 
+=head1 INSTALLATION
+
+See the L<https://metacpan.org/dist/Web-Solid-Auth/source/INSTALL> file in the 
+distribution.
+
 =head1 DESCRIPTION
 
 This is a Solid-OIDC implementation of a connection class for the Solid
