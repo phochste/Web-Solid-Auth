@@ -6,6 +6,9 @@ Revision history for Web::Solid::Auth
   - Adding INSTALL instructions
   - Making the log4perl configuration file optional
 
+0.71  2021-10-13 19:46:21 CEST
+  - Fixing missing ldf:RDFSource
+
 0.7  2021-10-12 11:34:40 CEST
   - Add a mirror Solid option
   - Add an upload to Solid option
