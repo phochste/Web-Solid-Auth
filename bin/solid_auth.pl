@@ -24,6 +24,7 @@ my $opt_skip      = undef;
 my $opt_real      = undef;
 my $opt_keep      = undef;
 my $opt_log       = 'log4perl.conf';
+my $opt_header    = [];
 
 GetOptions(
     "clientid|c=s" => \$clientid ,
@@ -33,6 +34,7 @@ GetOptions(
     "keep"         => \$opt_keep ,
     "r"            => \$opt_recursive ,
     "x"            => \$opt_real ,
+    "H=s@"         => \$opt_header ,
     "log=s"        => \$opt_log ,
 );
 
@@ -108,8 +110,8 @@ Usage
 usage: $0 [options] authenticate
 
 # Curl like interaction
-usage: $0 [options] headers METHOD URL
-usage: $0 [options] curl <...>
+usage: $0 [options] headers method url
+usage: $0 [options] curl -- [curl-opts] url
 
 # Interpret LDP responses
 usage: $0 [options] list /path/ | url        # folder listing
@@ -138,7 +140,7 @@ options:
     --keep                   - keep containers (clean)
     -r                       - recursive (mirror, upload, clean)
     -x                       - do it for real (upload, clean)
-
+    -H "Header"              - add a header (get,post,put,head,delete)
 EOF
     exit 1
 }
@@ -224,7 +226,9 @@ EOF
 sub cmd_get {
     my ($url) = @_; 
 
-    my $response = _cmd_get($url);
+    my %headers = _make_headers();
+
+    my $response = _cmd_get($url,%headers);
 
     return $response if $response && ref($response) eq '';
 
@@ -263,8 +267,9 @@ sub cmd_head {
     }
 
     my $iri = _make_url($url);
+    my %headers = _make_headers();
 
-    my $response = $agent->head($iri);
+    my $response = $agent->head($iri,%headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
@@ -288,8 +293,9 @@ sub cmd_options {
     }
 
     my $iri = _make_url($url);
+    my %headers = _make_headers();
 
-    my $response = $agent->options($iri);
+    my $response = $agent->options($iri,%headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
@@ -330,14 +336,15 @@ sub cmd_put {
     }
 
     my $iri = _make_url($url);
+    my %headers = _make_headers();
 
     my $response;
 
     if ($file) {
-        $response = $agent->put($iri, $data, 'Content-Type' => $mimeType);
+        $response = $agent->put($iri, $data, 'Content-Type' => $mimeType, %headers);
     }
     else {
-        $response = $agent->put($iri);
+        $response = $agent->put($iri,%headers);
     }
 
     unless ($response->is_success) {
@@ -364,8 +371,9 @@ sub cmd_post {
     my $data = path($file)->slurp_raw;
 
     my $iri = _make_url($url);
+    my %headers = _make_headers();
 
-    my $response = $agent->post($iri, $data, 'Content-Type' => $mimeType);
+    my $response = $agent->post($iri, $data, 'Content-Type' => $mimeType, %headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
@@ -389,8 +397,9 @@ sub cmd_delete {
     }
 
     my $iri = _make_url($url);
+    my %headers = _make_headers();
 
-    my $response = $agent->delete($iri);
+    my $response = $agent->delete($iri, %headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
@@ -701,6 +710,15 @@ sub cmd_id_token {
     return 0;
 }
 
+sub _make_headers {
+    my %headers = ();
+    for my $h (@$opt_header) {
+        my ($n,$v) = split(/\s*:\s*/,$h,2);
+        $headers{$n} = $v;
+    }
+    return %headers;
+}
+
 sub _make_url {
     my $url = shift;
 
@@ -880,6 +898,10 @@ Recursive (clean, mirror, upload).
 =item -x
 
 Do it for real. The commands C<clean> and C<upload> will run by default in safe mode.
+
+=item -H name=value
+
+Add a header to a request (repeatable) for C<get>, C<post>, C<head>, C<options> and C<delete>.
 
 =back
 

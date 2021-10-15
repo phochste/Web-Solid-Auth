@@ -7,31 +7,31 @@ Web::Solid::Auth - A Perl Solid Web Client
     # On the command line
 
     # Set your default webid
-    export SOLID_WEBID=https://hochstenbach.inrupt.net/profile/card#me
+    export SOLID_WEBID=https://timbl.inrupt.net/profile/card#me
 
     # Authentication to a pod
     solid_auth.pl authenticate
 
     # Get the http headers for a authenticated request
-    solid_auth.pl headers GET https://hochstenbach.inrupt.net/inbox/
+    solid_auth.pl headers GET https://timbl.inrupt.net/inbox/
 
     # Act like a curl command and fetch authenticated content
-    solid_auth.pl curl -X GET https://hochstenbach.inrupt.net/inbox/
+    solid_auth.pl curl -X GET https://timbl.inrupt.net/inbox/
 
     # Add some data
     solid_auth.pl curl -X POST \
             -H "Content-Type: text/plain" \
             -d "abc" \
-            https://hochstenbach.inrupt.net/public/
+            https://timbl.inrupt.net/public/
     
     # Add a file
     solid_auth.pl curl -X PUT \
             -H "Content-Type: application/ld+json" \
             -d "@myfile.jsonld" \
-            https://hochstenbach.inrupt.net/public/myfile.jsonld 
+            https://timbl.inrupt.net/public/myfile.jsonld 
 
     # Set a solid base url
-    export SOLID_REMOTE_BASE=https://hochstenbach.inrupt.net
+    export SOLID_REMOTE_BASE=https://timbl.inrupt.net
 
     # List all resources on some Pod path
     solid_auth.pl list /public/
