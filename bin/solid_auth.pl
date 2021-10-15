@@ -337,14 +337,15 @@ sub cmd_put {
 
     my $iri = _make_url($url);
     my %headers = _make_headers();
+    $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'};
 
     my $response;
 
     if ($file) {
-        $response = $agent->put($iri, $data, 'Content-Type' => $mimeType, %headers);
+        $response = $agent->put($iri, $data, %headers);
     }
     else {
-        $response = $agent->put($iri,%headers);
+        $response = $agent->put($iri,undef,%headers);
     }
 
     unless ($response->is_success) {
@@ -372,8 +373,9 @@ sub cmd_post {
 
     my $iri = _make_url($url);
     my %headers = _make_headers();
+    $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'}; 
 
-    my $response = $agent->post($iri, $data, 'Content-Type' => $mimeType, %headers);
+    my $response = $agent->post($iri, $data, %headers);
 
     unless ($response->is_success) {
         printf STDERR "%s - failed to $url\n" , $response->code;
