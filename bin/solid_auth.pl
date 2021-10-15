@@ -8,6 +8,7 @@ use Web::Solid::Auth::Agent;
 use Web::Solid::Auth::Util;
 use HTTP::Date;
 use File::LibMagic;
+use File::Basename;
 use MIME::Base64;
 use JSON;
 use Path::Tiny;
@@ -23,6 +24,7 @@ my $opt_recursive = undef;
 my $opt_skip      = undef;
 my $opt_real      = undef;
 my $opt_keep      = undef;
+my $opt_delete    = undef;
 my $opt_log       = 'log4perl.conf';
 my $opt_header    = [];
 
@@ -32,6 +34,7 @@ GetOptions(
     "base|b=s"     => \$webbase ,
     "skip"         => \$opt_skip ,
     "keep"         => \$opt_keep ,
+    "delete"       => \$opt_delete ,
     "r"            => \$opt_recursive ,
     "x"            => \$opt_real ,
     "H=s@"         => \$opt_header ,
@@ -137,6 +140,7 @@ options:
     --clientid|c clientid    - optional the client-id
     --base|b base            - optional the base url for all requests
     --skip                   - skip files that already exist (mirror)
+    --delete                 - delete local files that are not at the remote location (mirror)
     --keep                   - keep containers (clean)
     -r                       - recursive (mirror, upload, clean)
     -x                       - do it for real (upload, clean)
@@ -452,6 +456,39 @@ sub cmd_mirror {
             _cmd_mirror($file,$directory);
         }
     }
+
+    _cmd_mirror_delete($url,$files,$directory) if $opt_delete;
+}
+
+sub _cmd_mirror_delete {
+    my ($base,$files,$directory) = @_;
+    my $path_names;
+    for my $file (sort keys %$files) {
+        my $path = substr($file,length($base));
+        $path =~ s{^\/}{};
+        $path =~ s{\/$}{};
+        next unless length($path);
+        $path_names->{$path} = 1;
+    }
+
+    for my $path (glob("$directory/*")) {
+        my $basename = basename($path);
+        next if -d $path; # we always keep directories
+        next if $path =~ /^[\.~]/;
+
+        if ($path_names->{$basename}) {
+            # ok , known path
+        }
+        else {
+            if ($opt_real) {
+                print STDERR "deleting: $path\n";
+                unlink $path;
+            }
+            else {
+                print STDERR "deleting: $path [test : use -x for real delete]\n";
+            }
+        }
+    }
 }
 
 sub _cmd_mirror {
@@ -459,8 +496,6 @@ sub _cmd_mirror {
 
     my $path = $url;
     $path =~ s{.*\/}{};
-
-    print "$url -> $directory/$path\n";
 
     my %headers = ();
 
@@ -474,11 +509,17 @@ sub _cmd_mirror {
         $headers{'If-Modified-Since'} = HTTP::Date::time2str($mtime);
     }
 
-    my $response = _cmd_get($url,%headers);
+    if ($opt_real) {
+        print "$url -> $directory/$path\n";
+        my $response = _cmd_get($url,%headers);
 
-    return $response unless $response && ref($response) ne '';
+        return $response unless $response && ref($response) ne '';
 
-    path("$directory/$path")->spew_raw($response->decoded_content);
+        path("$directory/$path")->spew_raw($response->decoded_content);
+    }
+    else {
+        print "$url -> $directory/$path [test : use -x for real mirror]\n";
+    }
 
     return 0;
 }
@@ -889,6 +930,10 @@ webserver.
 
 Skip resources that already exist (mirror).
 
+=item --delete
+
+Delete local files that are not in the remote container (mirror).
+
 =item --keep
 
 Keep containers when cleaning data (clean).
@@ -933,7 +978,7 @@ option to the C<CURL-OPTS> to stop solid_auth.pl from interpreting Curl options.
 
 List the resources in a LDP container at URL.
 
-=item mirror [-r] URL DIRECTORY
+=item mirror [-rx] [--skip] [--delete] URL DIRECTORY
 
 Mirror the contents of a container to a local directory. Optional provide C<-r>
 option for recursive mirror.
