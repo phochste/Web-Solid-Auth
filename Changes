@@ -1,6 +1,8 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+
+0.9  2021-10-17 17:51:15 CEST
   - Fixing relative/absolute URL bug
   - Adding support -- support to stop interpreting solid_auth.pl options
   - Adding documentation for the sold_auth.pl commands
