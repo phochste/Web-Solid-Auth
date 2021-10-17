@@ -4,3 +4,4 @@
 cpanfile.snapshot
 local
 Web-Solid-Auth*
+idp/**
