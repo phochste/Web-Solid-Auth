@@ -6,6 +6,7 @@ Revision history for Web::Solid::Auth
   - Adding documentation for the sold_auth.pl commands
   - Adding -H option for get,post,head,delete,options
   - Adding --delete option for deleting local files when doing a mirror
+  - Support adding a client_id 
 
 0.8  2021-10-14 09:10:19 CEST
   - Adding INSTALL instructions

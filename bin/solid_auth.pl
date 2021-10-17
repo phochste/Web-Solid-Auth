@@ -47,8 +47,13 @@ if (-e $opt_log) {
     Log::Log4perl::init($opt_log);
 }
 
-my $auth = Web::Solid::Auth->new(webid => $webid);
+my $auth = Web::Solid::Auth->new(webid => $webid, client_id => $clientid);
 my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
+
+if ($webbase) {
+    # Remove the trailing slash
+    $webbase =~ s{\/$}{};
+}
 
 my $ret;
 
@@ -194,8 +199,8 @@ sub _cmd_list {
     my $sparql =<<EOF;
 prefix ldp: <http://www.w3.org/ns/ldp#> 
 
-SELECT ?folder ?type {
-    ?folder a ?type .
+SELECT ?resource ?type {
+    ?resource a ?type .
     FILTER (?type IN (
                       ldp:Resource,
                       ldp:RDFSource,
@@ -212,7 +217,8 @@ EOF
 
     $util->sparql($model, $sparql, sub {
         my $res = shift;
-        my $name = $res->value('folder')->as_string; 
+        my $name = $res->value('resource')->as_string; 
+        $name = substr($name,length($webbase));
         $name =~ s/^\///; 
         my $type = $res->value('type')->as_string;
 
