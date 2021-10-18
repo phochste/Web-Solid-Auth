@@ -667,7 +667,7 @@ sub cmd_headers {
 
     usage() unless $method && $url;
 
-    my $headers = _headers($method,$url);
+    my $headers = _authentication_headers($method,$url);
 
     print "$headers\n";
 
@@ -693,7 +693,7 @@ sub cmd_curl {
         @rest = map { String::Escape::quote($_) } @rest;
     }
 
-    my $headers = _headers($method,$url);
+    my $headers = _authentication_headers($method,$url);
     my $opts    = join(" ",@rest);
     system("curl $headers $opts") == 0;
 }
@@ -780,7 +780,7 @@ sub _make_url {
     return "$webbase$1";
 }
 
-sub _headers {
+sub _authentication_headers {
     my ($method,$url) = @_;
 
     $webid //= $url;
