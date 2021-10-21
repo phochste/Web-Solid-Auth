@@ -70,6 +70,9 @@ elsif ($cmd eq 'put') {
 elsif ($cmd eq 'post') {
     $ret = cmd_post(@ARGV);
 }
+elsif ($cmd eq 'patch') {
+    $ret = cmd_patch(@ARGV);
+}
 elsif ($cmd eq 'delete') {
     $ret = cmd_delete(@ARGV);
 }
@@ -132,6 +135,7 @@ usage: $0 [options] get /path | url
 usage: $0 [options] put (/path/ | url)       # create a folder 
 usage: $0 [options] put (/path | url) file [mimeType]
 usage: $0 [options] post (/path | url) file [mimeType]
+usage: $0 [options] patch (/path | url) (file | SPARQL)
 usage: $0 [options] head /path | url
 usage: $0 [options] options /path | url
 usage: $0 [options] delete /path | url
@@ -200,8 +204,10 @@ sub _cmd_list {
 prefix ldp: <http://www.w3.org/ns/ldp#> 
 
 SELECT ?resource ?type {
-    ?resource a ?type .
-    FILTER (?type IN (
+    ?base ldp:contains ?resource .
+    OPTIONAL {
+        ?resource a ?type .
+        FILTER (?type IN (
                       ldp:Resource,
                       ldp:RDFSource,
                       ldp:Container,
@@ -210,6 +216,7 @@ SELECT ?resource ?type {
                       ldp:NonRDFSource
                       ) 
             )
+    }
 }
 EOF
 
@@ -218,15 +225,27 @@ EOF
     $util->sparql($model, $sparql, sub {
         my $res = shift;
         my $name = $res->value('resource')->as_string; 
-        $name = substr($name,length($webbase));
-        $name =~ s/^\///; 
-        my $type = $res->value('type')->as_string;
 
-        if ($FILES{$url . $name} && $FILES{$url . $name} eq 'container') {
+        $name = substr($name,length($webbase)) if ($name =~ /^http/);
+        $name =~ s/^\///; 
+
+        # Read the type from type or guess ..based on the name :P
+        my $type;
+
+        if ($res->value('type')) {
+            $type = $res->value('type')->as_string;
+        }
+        else {
+            $type = ($name =~ /\/$/) ? 'Container'  : 'Resource';
+        }
+
+        my $key = $url . $name;
+
+        if (exists $FILES{$key} && $FILES{$key} eq 'container') {
             # Containers are more interesting than resources
         }
         else {
-            $FILES{$url . $name} = $type =~ /Container/ ? "container" : "resource";
+            $FILES{$key} = $type =~ /Container/ ? "container" : "resource";
         }
     });
 
@@ -396,6 +415,42 @@ sub cmd_post {
     print STDERR $response->decoded_content , "\n";
 
     print $response->header('Location') , "\n";
+
+    return 0;
+}
+
+sub cmd_patch {
+    my ($url,$file_or_string) = @_;    
+
+    unless ($url && $file_or_string) {
+        print STDERR "Need a url and a file or string\n";
+        return 1;
+    }
+
+    my $sparql;
+
+    $file_or_string = '/dev/stdin' if $file_or_string eq '-';
+
+    if (-r $file_or_string) {
+        $sparql = path($file_or_string)->slurp_utf8;
+    }
+    else {
+        $sparql = $file_or_string;
+    }
+
+    my $iri = _make_url($url);
+    my %headers = _make_headers();
+    $headers{'Content-Type'} = 'application/sparql-update' unless $headers{'Content-Type'}; 
+
+    my $response = $agent->patch($iri, $sparql, %headers);
+
+    unless ($response->is_success) {
+        printf STDERR "%s - failed to $url\n" , $response->code;
+        printf STDERR "%s\n" , $response->message;
+        return 2;
+    }
+
+    print STDERR $response->decoded_content , "\n";
 
     return 0;
 }
@@ -759,6 +814,7 @@ sub cmd_id_token {
     return 0;
 }
 
+# Parse the optional provided headers into a hash
 sub _make_headers {
     my %headers = ();
     for my $h (@$opt_header) {
@@ -768,6 +824,7 @@ sub _make_headers {
     return %headers;
 }
 
+# Expand a relative url to a full url with SOLID_REMOTE_BASE
 sub _make_url {
     my $url = shift;
 
@@ -780,6 +837,7 @@ sub _make_url {
     return "$webbase$1";
 }
 
+# Expand the CURL header with authentication and DPop headers
 sub _authentication_headers {
     my ($method,$url) = @_;
 
@@ -799,6 +857,7 @@ sub _authentication_headers {
     return join(" ",@headers);
 }
 
+# Guess the mime type of a file
 sub _guess_mimetype {
     my ($path) = @_;
     
@@ -872,6 +931,11 @@ solid_auth.pl - A Solid management tool
       # Put some data
       solid_auth.pl put /public/myfile.txt myfile.txt 
 
+      # Patch data
+      solid_auth.pl patch /public/myfile.txt.meta  - <<EOF
+      INSERT DATA { <> <http://example.org> 1234 }
+      EOF
+      
       # Create a folder
       solid_auth.pl put /public/mytestfolder/
 
@@ -1015,6 +1079,11 @@ Return the HTTP Message of a HTTP PUT request of the FILE with MIMETYPE.
 Uses libmagic to guess the mimetype.
 
 When the URL ends with a slash (/), then a new container will be created.
+
+=item patch URL FILE|SPARQL
+
+Send the contents of a SPARQL patch file or string to a URL. Return the
+HTTP Message of the HTTP PATCH request to the URL.
 
 =item head URL
 

@@ -215,6 +215,9 @@ sub make_authentication_headers {
 sub get_cache_dir {
     my $self = shift;
     my $webid      = $self->webid;
+
+    die "No webid set" unless $webid;
+
     my $webid_sha  = Digest::SHA::sha1_hex($webid);
     my $cache_dir  = sprintf "%s/%s"
                             , $self->cache
@@ -355,6 +358,9 @@ sub get_openid_configuration {
     my ($self) = @_;
 
     my $issuer    = $self->issuer;
+    
+    # remove trailing slash (we will add it)
+    $issuer =~ s{\/$}{};
 
     my $cache_dir = $self->get_cache_dir;
     path($cache_dir)->mkpath unless -d $cache_dir;

@@ -1,7 +1,10 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
-
+  - Adding patch command
+  - Fixing directory listing for Pod that don't provide resource types
+    in the main container listing response
+  
 0.9  2021-10-17 17:51:15 CEST
   - Fixing relative/absolute URL bug
   - Adding support -- support to stop interpreting solid_auth.pl options
