@@ -366,7 +366,10 @@ sub cmd_put {
 
     my $iri = _make_url($url);
     my %headers = _make_headers();
-    $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'};
+
+    if ($mimeType) {
+        $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'};
+    }
 
     my $response;
 
@@ -374,6 +377,7 @@ sub cmd_put {
         $response = $agent->put($iri, $data, %headers);
     }
     else {
+        %headers = _link_header('<http://www.w3.org/ns/ldp#BasicContainer>; rel="type"', %headers);
         $response = $agent->put($iri,undef,%headers);
     }
 
@@ -402,6 +406,7 @@ sub cmd_post {
 
     my $iri = _make_url($url);
     my %headers = _make_headers();
+
     $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'}; 
 
     my $response = $agent->post($iri, $data, %headers);
@@ -822,6 +827,20 @@ sub _make_headers {
         $headers{$n} = $v;
     }
     return %headers;
+}
+
+# Add a Link header 
+sub _link_header {
+    my ($link,%headers) = @_;
+
+    if (exists $headers{Link}) {
+        $headers{Link} .= ", $link";
+    }
+    else {
+        $headers{Link} = $link;
+    }
+
+    %headers;
 }
 
 # Expand a relative url to a full url with SOLID_REMOTE_BASE
