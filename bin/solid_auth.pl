@@ -25,6 +25,7 @@ my $opt_skip      = undef;
 my $opt_real      = undef;
 my $opt_keep      = undef;
 my $opt_delete    = undef;
+my $opt_force     = undef;
 my $opt_log       = 'log4perl.conf';
 my $opt_header    = [];
 
@@ -35,6 +36,7 @@ GetOptions(
     "skip"         => \$opt_skip ,
     "keep"         => \$opt_keep ,
     "delete"       => \$opt_delete ,
+    "force|f"      => \$opt_force ,
     "r"            => \$opt_recursive ,
     "x"            => \$opt_real ,
     "H=s@"         => \$opt_header ,
@@ -151,6 +153,7 @@ options:
     --skip                   - skip files that already exist (mirror)
     --delete                 - delete local files that are not at the remote location (mirror)
     --keep                   - keep containers (clean)
+    --force|f                - force overwriting existing resources (put,patch)
     -r                       - recursive (mirror, upload, clean)
     -x                       - do it for real (upload, clean)
     -H "Header"              - add a header (get,post,put,head,delete)
@@ -374,6 +377,11 @@ sub cmd_put {
         $headers{'Content-Type'} = $mimeType unless $headers{'Content-Type'};
     }
 
+    # Prevent overwriting exiting resources    
+    unless ($opt_force) {
+        $headers{'If-None-Match'} = '*';
+    }
+
     my $response;
 
     if ($file) {
@@ -449,6 +457,11 @@ sub cmd_patch {
     my $iri = _make_url($url);
     my %headers = _make_headers();
     $headers{'Content-Type'} = 'application/sparql-update' unless $headers{'Content-Type'}; 
+
+    # Prevent overwriting exiting resources    
+    unless ($opt_force) {
+        $headers{'If-None-Match'} = '*';
+    }
 
     my $response = $agent->patch($iri, $sparql, %headers);
 
@@ -1029,6 +1042,10 @@ Delete local files that are not in the remote container (mirror).
 =item --keep
 
 Keep containers when cleaning data (clean).
+
+=item --force | -f
+
+Force overwriting existing resources (put, patch).
 
 =item -r
 
