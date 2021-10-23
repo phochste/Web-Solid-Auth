@@ -17,9 +17,10 @@ use Log::Any::Adapter;
 
 Log::Any::Adapter->set('Log4perl');
 
-my $webid    = $ENV{SOLID_WEBID};
-my $webbase  = $ENV{SOLID_REMOTE_BASE};
-my $clientid = $ENV{SOLID_CLIENT_ID};
+my $webid         = $ENV{SOLID_WEBID};
+my $webbase       = $ENV{SOLID_REMOTE_BASE};
+my $clientid      = $ENV{SOLID_CLIENT_ID};
+my $openid_idp    = $ENV{SOLID_IDP};
 my $opt_recursive = undef;
 my $opt_skip      = undef;
 my $opt_real      = undef;
@@ -33,6 +34,7 @@ my $opt_header    = [];
 GetOptions(
     "clientid|c=s" => \$clientid ,
     "webid|w=s"    => \$webid ,
+    "idp|i=s"      => \$openid_idp ,
     "base|b=s"     => \$webbase ,
     "skip"         => \$opt_skip ,
     "keep"         => \$opt_keep ,
@@ -51,7 +53,7 @@ if (-e $opt_log) {
     Log::Log4perl::init($opt_log);
 }
 
-my $auth = Web::Solid::Auth->new(webid => $webid, client_id => $clientid);
+my $auth = Web::Solid::Auth->new(webid => $webid, client_id => $clientid, issuer => $openid_idp);
 my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
 
 if ($webbase) {
@@ -151,6 +153,7 @@ usage: $0 id_token
 options:
     --webid|w webid          - your webid
     --clientid|c clientid    - optional the client-id
+    --idp|i idp_url          - optional identity provider
     --base|b base            - optional the base url for all requests
     --skip                   - skip files that already exist (mirror)
     --delete                 - delete local files that are not at the remote location (mirror)
@@ -1042,6 +1045,10 @@ The Base URL that is used for all delete, get, head, options post, put, patch re
 The URL to a static client configuration. See C<etc/web-solid-auth.jsonld> for an example.
 This file, edited for your own environment, needs to be published on some public accessible
 webserver.
+
+=item --idp
+
+Set the url of an OIDC identity provider. 
 
 =item --skip
 
