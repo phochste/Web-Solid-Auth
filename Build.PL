@@ -18,7 +18,7 @@ my %module_build_args = (
     "Patrick Hochstenbach"
   ],
   "dist_name" => "Web-Solid-Auth",
-  "dist_version" => "0.9",
+  "dist_version" => "0.91",
   "license" => "perl",
   "module_name" => "Web::Solid::Auth",
   "recursive_test_files" => 1,
