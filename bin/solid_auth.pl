@@ -1026,6 +1026,10 @@ The URL to a static client configuration. See C<etc/web-solid-auth.jsonld> for a
 This file, edited for your own environment, needs to be published on some public accessible
 webserver.
 
+=item SOLID_IDP
+
+The the URL of the OIDC identity provider. Optional
+
 =back
 
 =head1 CONFIGURATION
