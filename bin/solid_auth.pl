@@ -226,7 +226,10 @@ EOF
         my $res = shift;
         my $name = $res->value('resource')->as_string; 
 
-        $name = substr($name,length($webbase)) if ($name =~ /^http/);
+        # clean absolute urls into relative ones ...
+        if ($name =~ /^http/) {
+            $name = substr($name,length($iri));
+        }
         $name =~ s/^\///; 
 
         # Read the type from type or guess ..based on the name :P
