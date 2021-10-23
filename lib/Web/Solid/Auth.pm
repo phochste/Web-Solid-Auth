@@ -247,6 +247,13 @@ sub get_openid_provider {
     my ($self, $webid) = @_;
     $webid //= $self->webid;
 
+    # First try to find the OIDC issuer in the WebID profile
+    my $issuer = $self->get_webid_openid_provider($webid);
+
+    return $issuer if $issuer;
+
+    # If nothing is found there, try the OPTIONS header Links
+
     my $res = $self->options($webid);
 
     return undef unless $res;
@@ -255,21 +262,13 @@ sub get_openid_provider {
 
     my @links = HTTP::Link->parse($link);
 
-    my $issuer;
-
     for (@links) {
       if ($_->{relation} eq 'http://openid.net/specs/connect/1.0/issuer') {
           $issuer = $_->{iri};
       }
     }
 
-    if ($issuer) {
-        return $issuer;
-    }
-    else {
-        # Try the webid to find the issuer
-        return $self->get_webid_openid_provider($webid);
-    }
+    return $issuer;
 }
 
 sub get_webid_openid_provider {

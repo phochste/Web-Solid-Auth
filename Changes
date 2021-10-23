@@ -1,6 +1,7 @@
 Revision history for Web::Solid::Auth
 
 {{$NEXT}}
+  - Using the WebID profile solid:oidcIssuer as preferred issuer #11
 
 0.91  2021-10-23 15:46:27 CEST
   - Adding patch command
