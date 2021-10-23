@@ -26,6 +26,7 @@ my $opt_real      = undef;
 my $opt_keep      = undef;
 my $opt_delete    = undef;
 my $opt_force     = undef;
+my $opt_etag      = undef;
 my $opt_log       = 'log4perl.conf';
 my $opt_header    = [];
 
@@ -36,6 +37,7 @@ GetOptions(
     "skip"         => \$opt_skip ,
     "keep"         => \$opt_keep ,
     "delete"       => \$opt_delete ,
+    "etag=s"       => \$opt_etag ,
     "force|f"      => \$opt_force ,
     "r"            => \$opt_recursive ,
     "x"            => \$opt_real ,
@@ -382,6 +384,11 @@ sub cmd_put {
         $headers{'If-None-Match'} = '*';
     }
 
+    # Prevent overwriting changed resources
+    if ($opt_etag) {
+        $headers{'If-Match'} = $opt_etag;
+    }
+
     my $response;
 
     if ($file) {
@@ -461,6 +468,11 @@ sub cmd_patch {
     # Prevent overwriting exiting resources    
     unless ($opt_force) {
         $headers{'If-None-Match'} = '*';
+    }
+
+    # Prevent overwriting changed resources
+    if ($opt_etag) {
+        $headers{'If-Match'} = $opt_etag;
     }
 
     my $response = $agent->patch($iri, $sparql, %headers);
@@ -964,15 +976,15 @@ solid_auth.pl - A Solid management tool
       solid_auth.pl post /inbox/ myfile.jsonld 
 
       # Put some data
-      solid_auth.pl put /public/myfile.txt myfile.txt 
+      solid_auth.pl -f put /public/myfile.txt myfile.txt 
 
       # Patch data
-      solid_auth.pl patch /public/myfile.txt.meta  - <<EOF
+      solid_auth.pl -f patch /public/myfile.txt.meta  - <<EOF
       INSERT DATA { <> <http://example.org> 1234 }
       EOF
       
       # Create a folder
-      solid_auth.pl put /public/mytestfolder/
+      solid_auth.pl -f put /public/mytestfolder/
 
       # Delete some data
       solid_auth.pl delete /public/myfile.txt
@@ -1042,6 +1054,22 @@ Delete local files that are not in the remote container (mirror).
 =item --keep
 
 Keep containers when cleaning data (clean).
+
+=item --etag=STRING
+
+Only update the data when the 'Etag' header matches the given string (put,patch). E.g.
+use the C<head> command to find the ETag of a resource :
+
+    $ solid_auth.pl head /demo/LICENSE
+    ...
+    ETag: "189aa19989dc47eab46c9f2e8c47d0836bb08cb09f7863cbf3cd3bb9a751be27"
+    ...
+
+Now update the resource with ETag protection
+
+    $ solid_auth.pl \
+        --etag=189aa19989dc47eab46c9f2e8c47d0836bb08cb09f7863cbf3cd3bb9a751be27 \
+        put /demo/LICENSE LICENSE
 
 =item --force | -f
 

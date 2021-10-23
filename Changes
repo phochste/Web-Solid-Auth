@@ -8,6 +8,7 @@ Revision history for Web::Solid::Auth
   - Adding a rel=type when creating containers #6
   - Fixing bug in `list` command showing double relative paths
   - Adding a --force option to overwrite existing resources when PUT or PATCH
+  - Adding an --etag option to prevent updating resources when it changed PUT or PATCH
 
 0.9  2021-10-17 17:51:15 CEST
   - Fixing relative/absolute URL bug
