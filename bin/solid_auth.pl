@@ -744,6 +744,11 @@ sub cmd_authenticate {
 
     my $auth_url = $auth->make_authorization_request;
 
+    unless ($auth_url) {
+        print STDERR "Failed to create an authentication url\n";
+        return 3;
+    }
+
     print "Please visit this URL and login:\n\n$auth_url\n\n";
 
     print "Starting callback server...\n";

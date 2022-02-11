@@ -103,7 +103,18 @@ sub make_authorization_request {
     my $redirect_uri      = $self->redirect_uri;
 
     my $registration_conf = $self->get_client_configuration;
+
+    unless ($registration_conf) {
+        $self->log->error("failed to get client configuration");
+        return undef;
+    }
+
     my $openid_conf       = $self->get_openid_configuration;
+
+    unless ($openid_conf) {
+        $self->log->error("failed to get openid configuration");
+        return undef;
+    }
 
     my $authorization_endpoint = $openid_conf->{authorization_endpoint};
     my $client_id              = $registration_conf->{client_id};
@@ -140,7 +151,18 @@ sub make_access_token {
     my $redirect_uri      = $self->redirect_uri;
 
     my $openid_conf       = $self->get_openid_configuration;
+
+    unless ($openid_conf) {
+        $self->log->error("failed to get openid configuration");
+        return undef;
+    }
+
     my $registration_conf = $self->get_client_configuration;
+
+    unless ($registration_conf) {
+        $self->log->error("failed to get client configuration");
+        return undef;
+    }
 
     my $token_endpoint    = $openid_conf->{token_endpoint};
     my $token_endpoint_auth_methods_supported = $openid_conf->{token_endpoint_auth_methods_supported} // [];
@@ -245,6 +267,7 @@ sub get_access_token {
 
 sub get_openid_provider {
     my ($self, $webid) = @_;
+
     $webid //= $self->webid;
 
     # First try to find the OIDC issuer in the WebID profile
@@ -305,6 +328,12 @@ sub get_client_configuration {
     path($cache_dir)->mkpath unless -d $cache_dir;
 
     my $openid_conf           = $self->get_openid_configuration;
+
+    unless ($openid_conf) {
+        $self->log->error("failed to get openid configuration");
+        return undef;
+    }
+
     my $redirect_uri          = $self->redirect_uri;
     my $registration_endpoint = $openid_conf->{registration_endpoint};
 
@@ -357,7 +386,12 @@ sub get_openid_configuration {
     my ($self) = @_;
 
     my $issuer    = $self->issuer;
-    
+
+    unless ($issuer) {
+        $self->log->error("failed to find issuer");
+        return undef;
+    }
+
     # remove trailing slash (we will add it)
     $issuer =~ s{\/$}{};
 
