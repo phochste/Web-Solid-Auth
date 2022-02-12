@@ -53,7 +53,12 @@ if (-e $opt_log) {
     Log::Log4perl::init($opt_log);
 }
 
-my $auth = Web::Solid::Auth->new(webid => $webid, client_id => $clientid, issuer => $openid_idp);
+my %auth_conf = ();
+$auth_conf{webid}     = $webid if $webid;
+$auth_conf{client_id} = $clientid if $clientid;
+$auth_conf{issuer}    = $openid_idp if $openid_idp;
+
+my $auth = Web::Solid::Auth->new(%auth_conf);
 my $agent = Web::Solid::Auth::Agent->new(auth => $auth);
 
 if ($webbase) {

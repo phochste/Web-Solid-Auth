@@ -59,7 +59,8 @@ sub _build_listener {
 }
 
 sub _build_issuer {
-    shift->get_openid_provider();
+    my $self = shift;
+    $self->get_openid_provider();
 }
 
 sub BUILD {
@@ -299,6 +300,7 @@ sub get_webid_openid_provider {
     $webid //= $self->webid;
 
     # Lets try plain JSON parsing for fun..
+    $self->log->debug("GET $webid Accept text/turtle");
     my $res = $self->get($webid, 'Accept' => 'text/turtle');
 
     return undef unless $res;
@@ -403,7 +405,7 @@ sub get_openid_configuration {
     unless (-f $cache_file) {
         my $url = "$issuer/.well-known/openid-configuration";
 
-        $self->log->info("reading openid configruation from $url");
+        $self->log->info("reading openid configuration from $url");
 
         # Get the well known openid
         my $data = $self->get_json($url);
@@ -478,7 +480,9 @@ sub get {
 
 sub get_json {
     my ($self, $url, %opts) = @_;
-    return decode_json($self->get($url, %opts));
+    my $json = $self->get($url,%opts);
+    return undef unless $json;
+    return decode_json($json);
 }
 
 sub post {
@@ -512,7 +516,11 @@ sub post_json {
         return undef;
     }
 
-    return decode_json($response->decoded_content);
+    my $json = $response->decoded_content; 
+    
+    return undef unless $json;
+
+    return decode_json($json);
 }
 
 sub options {
