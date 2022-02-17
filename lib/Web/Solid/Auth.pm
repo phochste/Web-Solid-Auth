@@ -225,7 +225,7 @@ sub make_authentication_headers {
 
     my $access  = $self->get_access_token;
 
-    return undef unless $access;
+    return undef unless $access && $access->{access_token};
 
     my $headers =  {
         Authorization => 'DPoP ' . $access->{access_token} ,
